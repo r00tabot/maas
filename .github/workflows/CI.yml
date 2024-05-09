@@ -1,0 +1,15 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Make
+      run: sudo -E -H -u runner make install-dependencies clean build cleandb 
+    - name: Run Tests
+      run: sudo -E -H -u runner make test
