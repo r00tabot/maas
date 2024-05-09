@@ -1,0 +1,31 @@
+name: Codecov
+
+on:
+  pull_request:
+    types: [ labeled ]
+    
+jobs:
+  run:
+    if: ${{ github.event.label.name == 'test-coverage' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install
+        run: sudo -E -H -u runner make install-dependencies clean build cleandb syncdb
+      - name: Region coverage
+        run: sudo -E -H -u runner test.region --with-coverage --cover-xml --cover-xml-file=./coverage-region.xml
+      - name: Rack coverage
+        run: sudo -E -H -u runner test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
+      - name: Rack coverage
+        run: sudo -E -H -u runner -c "source .ve/bin/activate && pip install pytest-cov && pytest --cov=./ --cov-report=xml"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          flags: smart-tests
+          verbose: true
+          files: ./coverage-region.xml,./coverage-rack.xml,./coverage.xml
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
