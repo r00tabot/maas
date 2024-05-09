@@ -23,3 +23,4 @@ charms, but you need to deploy to bare metal.
 For more information see the `MAAS guide`_.
 
 .. _MAAS guide: https://maas.io/
+ 
