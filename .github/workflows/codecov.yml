@@ -24,12 +24,15 @@ jobs:
       - name: Rack coverage
         run: bin/test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
       - name: pytest coverage
-        run: source .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage combine ./coverage-pytest ./coverage-rack.xml ./coverage-region.xml  
+        run: |
+          source .ve/bin/activate 
+          coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest 
+          coverage xml -i --data-file coverage-pytest
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           flags: smart-tests
           verbose: true
-          files: ./.coverage
+          files: ./coverage.xml, ./coverage-region.xml, ./coverage-rack.xml
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
