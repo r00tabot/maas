@@ -9,6 +9,7 @@ on:
 
 jobs:
   run:
+    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
