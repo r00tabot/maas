@@ -20,7 +20,7 @@ jobs:
       - name: Rack coverage
         run: bin/test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
       - name: pytest coverage
-        run: source .ve/bin/activate && pip install pytest-cov && pytest --cov=./ --cov-report=xml"
+        run: source .ve/bin/activate && pip install pytest-cov && pytest --cov=./ --cov-report=xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
