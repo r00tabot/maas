@@ -10,6 +10,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install
-      pip install tox
+        pip install tox
     - name: Run Tests
       run: make lint
