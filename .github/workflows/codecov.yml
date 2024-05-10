@@ -7,7 +7,7 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      run:
+      hack:
         description: 'Hack'
         required: false
         default: true
