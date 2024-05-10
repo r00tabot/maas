@@ -5,9 +5,15 @@ on:
     types: [ labeled ]
   schedule:
     - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: ''
+        default: ''
+
 jobs:
   run:
-    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' }}
+    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' || github.event.workflow_dispatch }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
