@@ -14,7 +14,7 @@ on:
 
 jobs:
   run:
-    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' || github.event.workflow_dispatch.inputs.hack == 'true' }}
+    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' || github.event.workflow_dispatch.inputs.hack == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
