@@ -22,7 +22,7 @@ jobs:
       - name: Rack coverage
         run: bin/test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
       - name: pytest coverage
-        run: source .ve/bin/activate && pip install coverage gevent && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage combine coverage-pytest coverage-rack.xml coverage-region.xml  
+        run: source .ve/bin/activate && pip install coverage gevent && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage combine ./coverage-pytest ./coverage-rack.xml ./coverage-region.xml  
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
