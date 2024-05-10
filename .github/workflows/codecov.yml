@@ -7,13 +7,14 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      test:
-        description: ''
-        default: ''
+      run:
+        description: 'Hack'
+        required: false
+        default: true
 
 jobs:
   run:
-    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' || github.event.workflow_dispatch }}
+    if: ${{ github.event.label.name == 'test-coverage' || github.event.schedule == '0 0 * * *' || github.event.workflow_dispatch.inputs.hack == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
