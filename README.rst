@@ -2,10 +2,6 @@
 MAAS: Metal as a Service
 ************************
 
-[![codecov](https://codecov.io/gh/r00tabot/maas/branch/master/graph/badge.svg?token=NT1TVSQXNW)](https://codecov.io/gh/r00tabot/maas)
-
-This is a mirror of https://git.launchpad.net/maas and is actually a tool used by r00ta for productivity and fun. 
-
 Metal as a Service -- MAAS -- lets you treat physical servers like virtual machines in the cloud.
 Rather than having to manage each server individually, MAAS turns your bare metal into an elastic
 cloud-like resource.
