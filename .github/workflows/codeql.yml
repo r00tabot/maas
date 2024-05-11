@@ -22,6 +22,17 @@ jobs:
     name: Analyze MAAS
     runs-on: ubuntu-latest
     timeout-minutes: 360 
+    permissions:
+      # required for all workflows
+      security-events: write
+
+      # required to fetch internal or private CodeQL packs
+      packages: read
+
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
