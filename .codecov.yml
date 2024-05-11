@@ -9,11 +9,10 @@ coverage:
         threshold: 0.1%
 comment: true
 ignore:
-  - */_version.py
   - src/tests
   - src/maastesting
   - src/perftests
   - src/migrations
-  - */tests/*
+  - "*/tests/*"
   - setup.py
   - versioneer.py
