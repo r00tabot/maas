@@ -1,0 +1,26 @@
+name: Power on e2e github runnner
+
+on:
+  pull_request:
+    types: [ labeled ]
+  schedule:
+    # Turn it on at least once a month otherwise the e2e runner will expire
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    if: ${{ github.event.label.name == 'full-test' }}
+    runs-on: [self-hosted, r630]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Power end2end runner
+        env:
+          HOMELAB_APIKEY: ${{ secrets.HOMELAB_APIKEY }}
+        run: | 
+          sudo snap install --channel=3.4/edge maas
+          maas login admin http://172.0.2.2:5240/MAAS $HOMELAB_APIKEY
+          maas admin machine power-on pdfarr
