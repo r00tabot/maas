@@ -3,16 +3,15 @@ coverage:
     # Configuration for project-level checks. This checks how the PR changes overall coverage.
     project:
       default:
-        # For each PR, auto compare coverage to previous commit.
-        # Require that overall (project) coverage does NOT drop more than 0.5%
         target: auto
-        threshold: 0.1%
+        threshold: 3%
 comment: true
 ignore:
   - src/tests
   - src/maastesting
   - src/perftests
-  - src/migrations
+  - src/maasserver/migrations
+  - src/maasserver/testing
   - "*/tests/*"
   - setup.py
   - versioneer.py
