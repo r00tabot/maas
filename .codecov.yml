@@ -13,5 +13,6 @@ ignore:
   - src/maasserver/migrations
   - src/maasserver/testing
   - "*/tests/*"
+  - "*/testing/*"
   - setup.py
   - versioneer.py
