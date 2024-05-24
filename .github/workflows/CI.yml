@@ -23,7 +23,7 @@ jobs:
     - name: Make
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies clean build cleandb 
     - name: Run Tests
-      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make test
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make test
     - name: cleanup
       if: always()
       run: lxc delete -f maas-ci-tester-${{ github.sha }}
