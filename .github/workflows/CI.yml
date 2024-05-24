@@ -20,8 +20,10 @@ jobs:
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 -- sh -c "apt-get update && apt-get install make" 
     - name: Configure git repo
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 -- git config --global --add safe.directory /home/ubuntu/maas
-    - name: Make
+    - name: Install deps
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies
+    - name: Build
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make
     - name: Run Tests
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make test
     - name: cleanup
