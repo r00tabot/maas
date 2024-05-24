@@ -16,6 +16,8 @@ jobs:
       run: sleep 10 
     - name: Copy repository to lxd container
       run: lxc file push -r ./ maas-ci-tester-${{ github.sha }}/home/ubuntu
+    - name: Install make
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 -- sh -c "apt-get update && apt-get install make" 
     - name: Make
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/ -- make install-dependencies clean build cleandb 
     - name: Run Tests
