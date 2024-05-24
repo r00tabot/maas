@@ -19,9 +19,9 @@ jobs:
     - name: Install make
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 -- sh -c "apt-get update && apt-get install make" 
     - name: Make
-      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/ -- make install-dependencies clean build cleandb 
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies clean build cleandb 
     - name: Run Tests
-      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/ -- make test
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make test
     - name: cleanup
       if: always()
       run: lxc delete -f maas-ci-tester-${{ github.sha }}
