@@ -21,7 +21,7 @@ jobs:
     - name: Configure git repo
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 -- git config --global --add safe.directory /home/ubuntu/maas
     - name: Make
-      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies clean build cleandb 
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies
     - name: Run Tests
       run: lxc exec maas-ci-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make test
     - name: cleanup
