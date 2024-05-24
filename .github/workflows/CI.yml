@@ -7,7 +7,7 @@ on:
 jobs:
   run:
     if: ${{ github.event.label.name == 'ci-test' }}
-    runs-on: [self-hosted, r630] 
+    runs-on: [self-hosted, quantagrid] 
     steps:
     - uses: actions/checkout@v4
     - name: create lxd container
