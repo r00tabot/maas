@@ -2,14 +2,24 @@ name: CI
 
 on:
   pull_request_target:
-    branches: [ "master" ]
+    types: [ labeled ]
 
 jobs:
   run:
-    runs-on: ubuntu-latest    
+    if: ${{ github.event.label.name == 'ci-test' }}
+    runs-on: [self-hosted, r630] 
     steps:
     - uses: actions/checkout@v4
+    - name: create lxd container
+      run: lxc launch ubuntu:22.04 maas-ci-tester-${{ github.sha }}
+    - name: Sleep 10 seconds and wait for container to get up
+      run: sleep 10 
+    - name: Copy repository to lxd container
+      run: lxc file push -r ./ maas-ci-tester-${{ github.sha }}/home/ubuntu
     - name: Make
-      run: sudo -E -H -u runner make install-dependencies clean build cleandb 
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/ -- make install-dependencies clean build cleandb 
     - name: Run Tests
-      run: sudo -E -H -u runner make test
+      run: lxc exec maas-ci-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/ -- make test
+    - name: cleanup
+      if: always()
+      run: lxc delete -f maas-ci-tester-${{ github.sha }}
