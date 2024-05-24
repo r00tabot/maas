@@ -1,7 +1,7 @@
 name: Power on e2e github runnner
 
 on:
-  pull_request:
+  pull_request_target:
     types: [ labeled ]
   schedule:
     # Turn it on at least once a month otherwise the e2e runner will expire
