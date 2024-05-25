@@ -21,7 +21,7 @@ jobs:
     - name: chmod
       run: find ./r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
-      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD --random $RANDOM_FLAG
+      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD
     - name: cleanup
       if: always()
       run: ./r00tabot-runner-config/pipeline/99-cleanup.sh
