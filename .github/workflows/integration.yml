@@ -12,7 +12,13 @@ jobs:
     - uses: actions/checkout@v4
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git
+    - name: Generate random number
+      id: generate_random
+      run: echo "RANDOM_FLAG=$((1 + RANDOM % 253))" >> $GITHUB_ENV
     - name: chmod
       run: find ./r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
-      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD
+      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD --random $RANDOM_FLAG
+    - name: cleanup
+      if: always()
+      run: ./r00tabot-runner-config/pipeline/99-cleanup.sh
