@@ -1,0 +1,18 @@
+name: Integration tests
+
+on:
+  pull_request_target:
+    types: [ labeled ]
+
+jobs:
+  run:
+    if: ${{ github.event.label.name == 'integration-test' }}
+    runs-on: [self-hosted, quantagrid] 
+    steps:
+    - uses: actions/checkout@v4
+    - name: Clone test repo
+      run: git clone https://github.com/r00ta/r00tabot-runner-config.git
+    - name: chmod
+      run: chmod -R -x r00tabot-runner-config
+    - name: test
+      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir=$PWD
