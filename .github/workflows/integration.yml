@@ -13,6 +13,6 @@ jobs:
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git
     - name: chmod
-      run: chmod -R -x r00tabot-runner-config
+      run: sudo chmod -R -x r00tabot-runner-config
     - name: test
       run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir=$PWD
