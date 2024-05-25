@@ -12,7 +12,7 @@ ignore:
   - src/perftests
   - src/maasserver/migrations
   - src/maasserver/testing
-  - "*/tests/*"
-  - "*/testing/*"
+  - "*/tests/**"
+  - "*/testing/**"
   - setup.py
   - versioneer.py
