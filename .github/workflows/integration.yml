@@ -12,9 +12,12 @@ jobs:
     - uses: actions/checkout@v4
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git
-    - name: Generate random number
-      id: generate_random
-      run: echo "RANDOM_FLAG=$((1 + RANDOM % 253))" >> $GITHUB_ENV
+    - name: Generate env
+      id: generate_env
+      run: |
+        RANDOM_INT=$((1 + RANDOM % 253))
+        echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
+        echo "CONTAINER_NAME=\"maas-tester-$RANDOM_INT\"" >> $GITHUB_ENV
     - name: chmod
       run: find ./r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
