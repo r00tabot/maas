@@ -15,4 +15,4 @@ jobs:
     - name: chmod
       run: find ./r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
-      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir=$PWD
+      run: ./r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD
