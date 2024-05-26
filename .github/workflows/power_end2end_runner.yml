@@ -23,4 +23,7 @@ jobs:
         run: | 
           sudo snap install --channel=3.4/edge maas
           maas login admin http://172.0.2.2:5240/MAAS $HOMELAB_APIKEY
-          maas admin machine power-on pdfarr
+          OUTPUT=$(maas admin machine query-power-state pdfarr)
+          if echo "$OUTPUT" | grep -q "off"; then
+              maas admin machine power-on pdfarr
+          fi
