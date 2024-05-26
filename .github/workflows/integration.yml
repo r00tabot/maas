@@ -41,7 +41,7 @@ jobs:
         echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
         echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
-        echo "PIPELINE_DIR=deb" >> $GITHUB_ENV
+        echo "TYPE=deb" >> $GITHUB_ENV
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
     - name: chmod
