@@ -6,7 +6,7 @@ on:
 
 jobs:
   snap:
-    if: ${{ github.event.label.name == 'integration-test' }}
+    if: ${{ github.event.label.name == 'test' }}
     runs-on: [self-hosted, quantagrid] 
     steps:
     - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
         $PIPELINE_DIR/pipeline/99-cleanup.sh
         rm -rf $PIPELINE_DIR
   deb:
-    if: ${{ github.event.label.name == 'integration-test' }}
+    if: ${{ github.event.label.name == 'test' }}
     runs-on: [self-hosted, quantagrid] 
     steps:
     - uses: actions/checkout@v4
