@@ -6,7 +6,7 @@ on:
 
 jobs:
   run:
-    if: ${{ github.event.label.name == 'ci-test' }}
+    if: ${{ github.event.label.name == 'test' }}
     runs-on: [self-hosted, quantagrid] 
     steps:
     - uses: actions/checkout@v4
