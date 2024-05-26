@@ -15,7 +15,7 @@ jobs:
       run: |
         RANDOM_INT=$((1 + RANDOM % 253))
         echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
-        echo "CONTAINER_NAME=\"maas-tester-$RANDOM_INT\"" >> $GITHUB_ENV
+        echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
