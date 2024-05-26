@@ -5,7 +5,7 @@ on:
     types: [ labeled ]
 
 jobs:
-  run:
+  snap:
     if: ${{ github.event.label.name == 'integration-test' }}
     runs-on: [self-hosted, quantagrid] 
     steps:
@@ -17,6 +17,31 @@ jobs:
         echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
         echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
+        echo "TYPE=snap" >> $GITHUB_ENV
+    - name: Clone test repo
+      run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
+    - name: chmod
+      run: find $PIPELINE_DIR -type f -iname "*.sh" -exec chmod +x {} +
+    - name: test
+      run: $PIPELINE_DIR/pipeline/execute.sh --maas_dir $PWD
+    - name: cleanup
+      if: always()
+      run: |
+        $PIPELINE_DIR/pipeline/99-cleanup.sh
+        rm -rf $PIPELINE_DIR
+  deb:
+    if: ${{ github.event.label.name == 'integration-test' }}
+    runs-on: [self-hosted, quantagrid] 
+    steps:
+    - uses: actions/checkout@v4
+    - name: Generate env
+      id: generate_env
+      run: |
+        RANDOM_INT=$((1 + RANDOM % 253))
+        echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
+        echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
+        echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
+        echo "PIPELINE_DIR=deb" >> $GITHUB_ENV
     - name: Clone test repo
       run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
     - name: chmod
