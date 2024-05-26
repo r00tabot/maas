@@ -10,7 +10,7 @@ on:
 
 jobs:
   run:
-    if: ${{ github.event.label.name == 'full-test' }}
+    if: ${{ github.event.label.name =~ '*-test' }}
     runs-on: [self-hosted, r630]
     steps:
       - name: Checkout
