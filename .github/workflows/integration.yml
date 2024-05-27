@@ -19,7 +19,9 @@ jobs:
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
         echo "TYPE=snap" >> $GITHUB_ENV
     - name: Clone test repo
-      run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
+      run: |
+        git config --global --add safe.directory $PIPELINE_DIR
+        git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
     - name: chmod
       run: find $PIPELINE_DIR -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
@@ -43,7 +45,9 @@ jobs:
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
         echo "TYPE=deb" >> $GITHUB_ENV
     - name: Clone test repo
-      run: git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
+      run: |
+        git config --global --add safe.directory $PIPELINE_DIR
+        git clone https://github.com/r00ta/r00tabot-runner-config.git $PIPELINE_DIR
     - name: chmod
       run: find $PIPELINE_DIR -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
