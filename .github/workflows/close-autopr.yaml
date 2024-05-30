@@ -20,3 +20,4 @@ jobs:
           pull-request-ignore-draft: true
           pull-request-ignore-all-milestones: true
           pull-request-stale-label: 'autoclose'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
