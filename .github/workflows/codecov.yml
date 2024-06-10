@@ -13,6 +13,13 @@ jobs:
     runs-on: [self-hosted, quantagrid] 
     steps:
     - uses: actions/checkout@v4
+      if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    - name: Checkout
+      if: github.event.label.name == 'coverage'
+      uses: actions/checkout@v3
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
+        fetch-depth: 0
     - name: Prepare env
       run: |
         echo "TMPDIR=$(mktemp -d)" >> $GITHUB_ENV
