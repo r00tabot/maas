@@ -41,13 +41,13 @@ jobs:
       run: |
         lxc exec maas-coverage-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies 
         lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make build
-        lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- sh -c "source .ve/bin/activate && pip install coverage gevent"
+        lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- sh -c ". .ve/bin/activate && pip install coverage gevent"
     - name: Region coverage
       run: lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- bin/test.region --with-coverage --cover-xml --cover-xml-file=./coverage-region.xml
     - name: Rack coverage
       run: lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- bin/test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
     - name: pytest coverage
-      run: lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- sh -c "source .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage xml -i --data-file coverage-pytest" 
+      run: lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- sh -c ". .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage xml -i --data-file coverage-pytest" 
     - name: Copy artifacts
       run: |
         lxc file pull -r maas-coverage-tester-${{ github.sha }}/home/ubuntu/maas/coverage.xml $TMPDIR
@@ -61,6 +61,6 @@ jobs:
         files: $TMPDIR/coverage.xml, $TMPDIR/coverage-region.xml, $TMPDIR/coverage-rack.xml
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-#    - name: cleanup
-#      if: always()
-#      run: lxc delete -f maas-coverage-tester-${{ github.sha }}
+    - name: cleanup
+      if: always()
+      run: lxc delete -f maas-coverage-tester-${{ github.sha }}
