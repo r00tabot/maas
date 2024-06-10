@@ -61,6 +61,6 @@ jobs:
         files: $TMPDIR/coverage.xml, $TMPDIR/coverage-region.xml, $TMPDIR/coverage-rack.xml
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-    - name: cleanup
-      if: always()
-      run: lxc delete -f maas-coverage-tester-${{ github.sha }}
+#    - name: cleanup
+#      if: always()
+#      run: lxc delete -f maas-coverage-tester-${{ github.sha }}
