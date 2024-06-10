@@ -41,7 +41,7 @@ jobs:
       run: |
         lxc exec maas-coverage-tester-${{ github.sha }} --user 0 --cwd /home/ubuntu/maas/ -- make install-dependencies 
         lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- make build
-        lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- source .ve/bin/activate && pip install coverage gevent
+        lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- sh -c "source .ve/bin/activate && pip install coverage gevent"
     - name: Region coverage
       run: lxc exec maas-coverage-tester-${{ github.sha }} --user 1000 --cwd /home/ubuntu/maas/ -- bin/test.region --with-coverage --cover-xml --cover-xml-file=./coverage-region.xml
     - name: Rack coverage
