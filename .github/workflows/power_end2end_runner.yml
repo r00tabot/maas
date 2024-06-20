@@ -25,5 +25,5 @@ jobs:
           maas login admin http://172.0.2.2:5240/MAAS $HOMELAB_APIKEY
           OUTPUT=$(maas admin machine query-power-state pdfarr)
           if echo "$OUTPUT" | grep -q "off"; then
-              maas admin machine power-on pdfarr
+              maas admin machine power-on begmgr #pdfarr
           fi
