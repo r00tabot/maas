@@ -20,9 +20,10 @@ jobs:
     - name: Get changed Python files
       id: changed-files
       run: |
-        CHANGED_FILES=$(jq -r '.pull_request.files[].filename' < $GITHUB_EVENT_PATH)
-        echo "$CHANGED_FILES" | grep '\.py$' || true
-        echo "::set-output name=files::$CHANGED_FILES"
+        URL="https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files"
+        FILES=$(curl -s -X GET -G $URL | jq -r '.[] | .filename')
+        echo "$FILES" | grep '\.py$' || true
+        echo "::set-output name=files::$FILES"
     - name: Run mypy
       if: steps.changed-files.outputs.files != ''
       run: |
