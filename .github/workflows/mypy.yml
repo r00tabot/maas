@@ -13,13 +13,17 @@ jobs:
       with:
         python-version: '3.10'
     - run: pip install mypy  
-    - name: Get Python changed files
-      id: changed-py-files
-      uses: tj-actions/changed-files@v23
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v45
       with:
         files: |
           *.py
           **/*.py
     - name: Run mypy
-      if: steps.changed-py-files.outputs.any_changed == 'true'
-      run: mypy ${{ steps.changed-py-files.outputs.all_changed_files }} --ignore-missing-imports
+      env:
+        ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        for file in ${ALL_CHANGED_FILES}; do
+          mypy $file --ignore-missing-imports
+        done
