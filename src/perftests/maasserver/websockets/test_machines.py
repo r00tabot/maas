@@ -10,18 +10,15 @@ from maasserver.websockets.handlers.machine import MachineHandler
 
 
 @pytest.mark.allow_transactions
-def test_perf_list_machines_Websocket_endpoint(perf, factory, maasdb):
+def test_perf_list_machines_Websocket_endpoint(perf, admin, maasdb):
     # This should test the websocket calls that are used to load
     # the machine listing page on the initial page load.
-    admin, session = factory.make_admin_with_session()
     transaction.commit()
     machine_count = Machine.objects.all().count()
     expected_pages = math.ceil(machine_count / 50)
     num_pages = 0
     with perf.record("test_perf_list_machines_Websocket_endpoint"):
-        ws_handler = MachineHandler(
-            admin, {}, None, session_id=session.session_key
-        )
+        ws_handler = MachineHandler(admin, {}, None)
         # Extracted from a clean load of labmaas with empty local
         # storage
         params = {
@@ -39,16 +36,13 @@ def test_perf_list_machines_Websocket_endpoint(perf, factory, maasdb):
 
 
 @pytest.mark.allow_transactions
-def test_perf_list_machines_Websocket_endpoint_all(perf, factory, maasdb):
+def test_perf_list_machines_Websocket_endpoint_all(perf, admin, maasdb):
     # How long would it take to list all the machines using the
     # websocket without any pagination.
-    admin, session = factory.make_admin_with_session()
     transaction.commit()
     machine_count = Machine.objects.all().count()
     with perf.record("test_perf_list_machines_Websocket_endpoint_all"):
-        ws_handler = MachineHandler(
-            admin, {}, None, session_id=session.session_key
-        )
+        ws_handler = MachineHandler(admin, {}, None)
         # Extracted from a clean load of labmaas with empty local
         # storage
         params = {

@@ -4,8 +4,8 @@
 from typing import Callable, Self
 
 from maasservicelayer.context import Context
-from maasservicelayer.db.repositories.configurations import (
-    ConfigurationsRepository,
+from maasservicelayer.db.repositories.database_configurations import (
+    DatabaseConfigurationsRepository,
 )
 from maasservicelayer.db.repositories.dhcpsnippets import (
     DhcpSnippetsRepository,
@@ -74,6 +74,9 @@ from maasservicelayer.services.dnsresourcerecordsets import (
 )
 from maasservicelayer.services.dnsresources import DNSResourcesService
 from maasservicelayer.services.domains import DomainsService
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationsService,
+)
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.external_auth import ExternalAuthService
 from maasservicelayer.services.fabrics import FabricsService
@@ -141,6 +144,7 @@ class ServiceCollectionV3:
     # Keep them in alphabetical order, please
     agents: AgentsService
     auth: AuthService
+    database_configurations: DatabaseConfigurationsService
     configurations: ConfigurationsService
     dhcpsnippets: DhcpSnippetsService
     dnsdata: DNSDataService
@@ -185,16 +189,24 @@ class ServiceCollectionV3:
         cache: CacheForServices,
     ) -> Self:
         services = cls()
-        services.configurations = ConfigurationsService(
+        services.database_configurations = DatabaseConfigurationsService(
             context=context,
-            configurations_repository=ConfigurationsRepository(context),
+            database_configurations_repository=DatabaseConfigurationsRepository(
+                context
+            ),
         )
         services.service_status = ServiceStatusService(
             context=context,
             service_status_repository=ServiceStatusRepository(context),
         )
         services.secrets = await SecretsServiceFactory.produce(
-            context=context, config_service=services.configurations
+            context=context,
+            database_configurations_service=services.database_configurations,
+        )
+        services.configurations = ConfigurationsService(
+            context=context,
+            database_configurations_service=services.database_configurations,
+            secrets_service=services.secrets
         )
         services.temporal = TemporalService(
             context=context,
@@ -291,7 +303,6 @@ class ServiceCollectionV3:
         services.staticipaddress = StaticIPAddressService(
             context=context,
             temporal_service=services.temporal,
-            configurations_service=services.configurations,
             staticipaddress_repository=StaticIPAddressRepository(context),
         )
         services.subnets = SubnetsService(

@@ -6,8 +6,8 @@ from typing import Any
 
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.secrets import SecretsRepository
+from maasservicelayer.services import DatabaseConfigurationsService
 from maasservicelayer.services.base import Service
-from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.vault.api.models.exceptions import VaultNotFoundException
 from maasservicelayer.vault.manager import (
     AsyncVaultManager,
@@ -152,7 +152,9 @@ class SecretsServiceFactory:
 
     @classmethod
     async def produce(
-        cls, context: Context, config_service: ConfigurationsService
+        cls,
+        context: Context,
+        database_configurations_service: DatabaseConfigurationsService,
     ) -> SecretsService:
         """
         Produce a `SecretService` based on the configuration settings.
@@ -167,7 +169,9 @@ class SecretsServiceFactory:
         is required to re-evaluate the Vault settings.
         """
         if cls.IS_VAULT_ENABLED is None:
-            result = await config_service.get(cls.VAULT_CONFIG_NAME)
+            result = await database_configurations_service.get(
+                cls.VAULT_CONFIG_NAME
+            )
             cls.IS_VAULT_ENABLED = result if result else False
         if cls.IS_VAULT_ENABLED:
             vault_manager = get_region_vault_manager()

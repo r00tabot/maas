@@ -7,6 +7,7 @@ from collections import defaultdict, namedtuple
 from contextlib import suppress
 import uuid
 
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import CharField, JSONField, Manager, Model
 from django.db.models.signals import post_save
 
@@ -15,6 +16,7 @@ from maascommon.workflows.dhcp import (
     ConfigureDHCPParam,
 )
 from maasserver.listener import notify_action
+from maasserver.sqlalchemy import service_layer
 from maasserver.utils.orm import post_commit_do
 from maasserver.workflow import start_workflow
 from maasservicelayer.models.configurations import (
@@ -73,34 +75,15 @@ class ConfigManager(Manager):
             item exists.
         :type default: object
         :return: A config value.
-        :raises: Config.MultipleObjectsReturned
         """
-        from maasserver.secrets import SecretManager, SecretNotFound
-
-        config_model = None
-        try:
-            config_model = ConfigFactory.get_config_model(name)
-        except ValueError:
-            log.warn(
-                f"The configuration '{name}' is not known. Using the default {default} if the config does not exist in the DB."
-            )
-            default_value = default
-        else:
-            default_value = config_model.default
-        try:
-            if config_model and config_model.stored_as_secret:
-                return SecretManager().get_simple_secret(
-                    config_model.secret_name
-                )
-            return self.get(name=name).value
-        except (Config.DoesNotExist, SecretNotFound):
-            return default_value
+        return service_layer.services.configurations.get(name, default)
 
     def get_configs(self, names):
         """Return the config values corresponding to the given config names.
         Return None or the provided default if the config value does not
         exist.
         """
+        return service_layer.services.configurations.get_many(names)
         from maasserver.secrets import SecretManager, SecretNotFound
 
         config_models = {
@@ -147,6 +130,7 @@ class ConfigManager(Manager):
         :param request: The http request of the audit event to be created.
         :type request: HttpRequest object.
         """
+        return service_layer.services.configurations.set(name, value, None if isinstance(request.user, AnonymousUser) else request.user)
         from maasserver.audit import create_audit_event
         from maasserver.secrets import SecretManager
 

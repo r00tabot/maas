@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.secrets import SecretsRepository
 from maasservicelayer.models.secrets import Secret
-from maasservicelayer.services import ConfigurationsService
+from maasservicelayer.services import DatabaseConfigurationsService
 from maasservicelayer.services.secrets import (
     LocalSecretsStorageService,
     SecretNotFound,
@@ -198,11 +198,13 @@ class TestSecretServiceFactory:
     async def test_with_default_settings(self) -> None:
         db_connection = Mock(AsyncConnection)
         context = Context(connection=db_connection)
-        configuration_service_mock = Mock(ConfigurationsService)
-        configuration_service_mock.get.return_value = None
+        database_configuration_service_mock = Mock(
+            DatabaseConfigurationsService
+        )
+        database_configuration_service_mock.get.return_value = None
         assert SecretsServiceFactory.IS_VAULT_ENABLED is None
         vault_service = await SecretsServiceFactory.produce(
-            context, configuration_service_mock
+            context, database_configuration_service_mock
         )
         assert SecretsServiceFactory.IS_VAULT_ENABLED is False
         assert isinstance(vault_service, LocalSecretsStorageService)
@@ -210,10 +212,12 @@ class TestSecretServiceFactory:
     async def test_with_vault_enabled(self) -> None:
         db_connection = Mock(AsyncConnection)
         context = Context(connection=db_connection)
-        configuration_service_mock = Mock(ConfigurationsService)
-        configuration_service_mock.get.return_value = True
+        database_configuration_service_mock = Mock(
+            DatabaseConfigurationsService
+        )
+        database_configuration_service_mock.get.return_value = True
         vault_service = await SecretsServiceFactory.produce(
-            context, configuration_service_mock
+            context, database_configuration_service_mock
         )
         assert SecretsServiceFactory.IS_VAULT_ENABLED is True
         assert isinstance(vault_service, VaultSecretsService)
@@ -221,10 +225,12 @@ class TestSecretServiceFactory:
     async def test_with_vault_disabled(self) -> None:
         db_connection = Mock(AsyncConnection)
         context = Context(connection=db_connection)
-        configuration_service_mock = Mock(ConfigurationsService)
-        configuration_service_mock.get.return_value = False
+        database_configuration_service_mock = Mock(
+            DatabaseConfigurationsService
+        )
+        database_configuration_service_mock.get.return_value = False
         vault_service = await SecretsServiceFactory.produce(
-            context, configuration_service_mock
+            context, database_configuration_service_mock
         )
         assert SecretsServiceFactory.IS_VAULT_ENABLED is False
         assert isinstance(vault_service, LocalSecretsStorageService)
@@ -232,10 +238,12 @@ class TestSecretServiceFactory:
     async def test_clear(self) -> None:
         db_connection = Mock(AsyncConnection)
         context = Context(connection=db_connection)
-        configuration_service_mock = Mock(ConfigurationsService)
-        configuration_service_mock.get.return_value = False
+        database_configuration_service_mock = Mock(
+            DatabaseConfigurationsService
+        )
+        database_configuration_service_mock.get.return_value = False
         await SecretsServiceFactory.produce(
-            context, configuration_service_mock
+            context, database_configuration_service_mock
         )
         assert SecretsServiceFactory.IS_VAULT_ENABLED is False
         SecretsServiceFactory.clear()

@@ -4,8 +4,9 @@ from dataclasses import dataclass
 
 from maasservicelayer.apiclient.client import APIClient
 from maasservicelayer.context import Context
+from maasservicelayer.models.configurations import MAASUrlConfig
+from maasservicelayer.services import DatabaseConfigurationsService, ConfigurationsService
 from maasservicelayer.services.base import Service, ServiceCache
-from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.users import UsersService
 
 
@@ -40,7 +41,7 @@ class AgentsService(Service):
         if self._apiclient:
             return self._apiclient
 
-        maas_url = await self.configurations_service.get("maas_url")
+        maas_url = await self.configurations_service.get(name=MAASUrlConfig.name)
 
         apikeys = await self.users_service.get_user_apikeys("MAAS")
         # API Key for MAAS is always present
