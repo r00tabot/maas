@@ -11,15 +11,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-      with:
-        ref: "refs/pull/${{ github.event.number }}/merge"
-        fetch-depth: 0
     - name: Generate env
       id: generate_env
       run: |
-        RANDOM_INT=$((1 + RANDOM % 253))
-        echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
-        echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
         echo "TYPE=snap" >> $GITHUB_ENV
     - name: Clone test repo
@@ -30,26 +24,15 @@ jobs:
       run: find $PIPELINE_DIR -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
       run: $PIPELINE_DIR/pipeline/execute.sh --maas_dir $PWD
-    - name: cleanup
-      if: always()
-      run: |
-        $PIPELINE_DIR/pipeline/99-cleanup.sh
-        rm -rf $PIPELINE_DIR
   deb:
     if: ${{ github.event.label.name == 'test' }}
     runs-on: [self-hosted, tester] 
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-      with:
-        ref: "refs/pull/${{ github.event.number }}/merge"
-        fetch-depth: 0
     - name: Generate env
       id: generate_env
       run: |
-        RANDOM_INT=$((1 + RANDOM % 253))
-        echo "SUBNET_PREFIX=$RANDOM_INT" >> $GITHUB_ENV
-        echo "CONTAINER_NAME=maas-tester-$RANDOM_INT" >> $GITHUB_ENV
         echo "PIPELINE_DIR=$(mktemp -d)" >> $GITHUB_ENV
         echo "TYPE=deb" >> $GITHUB_ENV
     - name: Clone test repo
@@ -60,8 +43,3 @@ jobs:
       run: find $PIPELINE_DIR -type f -iname "*.sh" -exec chmod +x {} +
     - name: test
       run: $PIPELINE_DIR/pipeline/execute.sh --maas_dir $PWD
-    - name: cleanup
-      if: always()
-      run: |
-        $PIPELINE_DIR/pipeline/99-cleanup.sh
-        rm -rf $PIPELINE_DIR
