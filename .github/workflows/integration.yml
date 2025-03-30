@@ -11,6 +11,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        submodules: 'true'
     - name: Clone test repo
       run: |
         git clone https://github.com/r00ta/r00tabot-runner-config.git /tmp/r00tabot-runner-config
@@ -25,6 +27,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        submodules: 'true'
     - name: Clone test repo
       run: |
         git clone https://github.com/r00ta/r00tabot-runner-config.git /tmp/r00tabot-runner-config
