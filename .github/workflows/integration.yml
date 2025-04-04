@@ -7,7 +7,7 @@ on:
 jobs:
   snap:
     if: ${{ github.event.label.name == 'test' }}
-    runs-on: [self-hosted, tester] 
+    runs-on: [self-hosted, large-runner] 
     steps:
     - name: Checkout
       uses: actions/checkout@v3
