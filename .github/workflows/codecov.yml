@@ -27,20 +27,34 @@ jobs:
     - name: Install deps
       run: |
         make install-dependencies 
+        go install github.com/axw/gocov/gocov@latest 
+        go install github.com/AlekSi/gocov-xml@latest
         make
         sh -c ". .ve/bin/activate && pip install coverage gevent && deactivate"
+    - name: Legacy region coverage
+      run: bin/test.region.legacy --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-legacy-region.xml
     - name: Region coverage
-      run: bin/test.region --with-coverage --cover-xml --cover-xml-file=./coverage-region.xml
+      run: bin/test.region --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-region.xml
     - name: Rack coverage
-      run: bin/test.rack --with-coverage --cover-xml --cover-xml-file=./coverage-rack.xml
+      run: bin/test.rack --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-rack.xml
     - name: pytest coverage
-      run: sh -c ". .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --data-file=./coverage-pytest -m pytest && coverage xml -i --data-file coverage-pytest" 
+      run: sh -c ". .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --branch --data-file=./coverage-pytest -m pytest && coverage xml -i --data-file coverage-pytest" 
+    - name: go coverage
+      run: |
+        make test-go-cover
+        cd src/maasagent
+        ~/go/bin/gocov convert cover.out | ~/go/bin/gocov-xml > coverage-maasagent.xml
+        mv coverage-maasagent.xml ../../
+        cd ../host-info
+        ~/go/bin/gocov convert cover.out | ~/go/bin/gocov-xml > coverage-host-info.xml
+        mv coverage-maasagent.xml ../../
+        cd ../../
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         flags: smart-tests
         verbose: true
         directory: .
-        files: coverage.xml, coverage-region.xml, coverage-rack.xml
+        files: coverage-legacy-region.xml, coverage-region.xml, coverage-rack.xml, coverage-maasagent.xml, coverage-host-info.xml
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
