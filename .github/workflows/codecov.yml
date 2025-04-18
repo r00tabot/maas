@@ -55,6 +55,6 @@ jobs:
         flags: smart-tests
         verbose: true
         directory: .
-        files: coverage-legacy-region.xml, coverage-region.xml, coverage-rack.xml, coverage-maasagent.xml, coverage-host-info.xml
+        files: coverage-legacy-region.xml, coverage-region.xml, coverage-rack.xml, coverage.xml, coverage-maasagent.xml, coverage-host-info.xml
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
