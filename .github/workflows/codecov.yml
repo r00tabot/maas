@@ -52,7 +52,7 @@ jobs:
         mv coverage-maasagent.xml ../../
         cd ../host-info
         ~/go/bin/gocov convert cover.out | ~/go/bin/gocov-xml > coverage-host-info.xml
-        mv coverage-maasagent.xml ../../
+        mv coverage-host-info.xml ../../
         cd ../../
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
