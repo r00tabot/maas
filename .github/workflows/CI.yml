@@ -6,8 +6,9 @@ on:
 
 jobs:
   run:
-    if: ${{ github.event.label.name == 'test' }}
+    if: ${{ github.event.label.name == 'unit-tests' }}
     runs-on: [self-hosted, tester] 
+    timeout-minutes: 120
     steps:
     - name: Checkout
       uses: actions/checkout@v3
