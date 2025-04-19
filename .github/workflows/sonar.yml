@@ -7,7 +7,7 @@ on:
     types: [ labeled ]
 jobs:
   sonarqube:
-    if: ${{ github.event.label.name == 'sonar' }}
+    if: github.event_name == 'push' || github.event.label.name == 'sonar'
     name: SonarQube
     runs-on: [self-hosted, medium-runner]
     steps:
