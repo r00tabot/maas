@@ -20,4 +20,3 @@ jobs:
         env:
           SONAR_SCANNER_OPTS: "-Xmx4096m"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          RUNNER_DEBUG: 1
