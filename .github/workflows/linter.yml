@@ -9,7 +9,9 @@ jobs:
     runs-on: ubuntu-latest    
     steps:
     - uses: actions/checkout@v4
-    - name: Install
-      run: pip install tox
+    - name: Install make
+      run: sudo apt-get update && sudo apt-get install make
+    - name: Install dependencies
+      run: make install-dependencies
     - name: Run Tests
       run: make lint
