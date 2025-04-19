@@ -6,7 +6,8 @@ on:
 
 jobs:
   snap:
-    if: ${{ github.event.label.name == 'test' }}
+    if: ${{ github.event.label.name == 'integration-tests' }}
+    timeout-minutes: 120
     runs-on: [self-hosted, large-runner] 
     steps:
     - name: Checkout
@@ -24,7 +25,8 @@ jobs:
     - name: test
       run: TYPE=snap /tmp/r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD
   deb:
-    if: ${{ github.event.label.name == 'test' }}
+    if: ${{ github.event.label.name == 'integration-tests' }}
+    timeout-minutes: 120
     runs-on: [self-hosted, large-runner] 
     steps:
     - name: Checkout
