@@ -8,7 +8,7 @@ on:
 jobs:
   sonarqube:
     name: SonarQube
-    runs-on: self-hosted
+    runs-on: [self-hosted, medium-runner]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,6 +18,6 @@ jobs:
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
-          SONAR_SCANNER_OPTS: "-Xmx2048m"
+          SONAR_SCANNER_OPTS: "-Xmx4096m"
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           RUNNER_DEBUG: 1
