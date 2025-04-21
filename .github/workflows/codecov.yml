@@ -9,7 +9,7 @@ on:
 
 jobs:
   run:  
-    if: github.event_name == 'push' || github.event.label.name == 'coverage'
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage')
     runs-on: [self-hosted, tester] 
     steps:
     - uses: actions/checkout@v4
