@@ -12,8 +12,15 @@ jobs:
     runs-on: [self-hosted, medium-runner]
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'push'
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Checkout
+        if: contains(github.event.pull_request.labels.*.name, 'sonar')
+        uses: actions/checkout@v4
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
+          fetch-depth: 0       
       - name: Setup proxy
         run: echo "Acquire::http::Proxy \"http://172.0.2.161:8000\";" | sudo tee /etc/apt/apt.conf.d/00proxy
       - name: Install dependencies
