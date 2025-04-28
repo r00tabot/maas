@@ -1,5 +1,5 @@
-#  Copyright 2024 Canonical Ltd.  This software is licensed under the
-#  GNU Affero General Public License version 3 (see the file LICENSE).
+# Copyright 2024-2025 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 
 from operator import eq
 
@@ -356,11 +356,11 @@ class TestQuerySpec:
                 [
                     Clause(
                         condition=eq(B.c.id, 1),
-                        joins=[join(A, B, eq(A.c.b_id, B.c.id))],
+                        joins=[join(B, C, eq(B.c.c_id, C.c.id))],
                     ),
                     Clause(
                         condition=eq(B.c.id, 2),
-                        joins=[join(A, B, eq(A.c.b_id, B.c.id))],
+                        joins=[join(B, C, eq(B.c.c_id, C.c.id))],
                     ),
                 ]
             )
@@ -373,7 +373,34 @@ class TestQuerySpec:
                     compile_kwargs={"literal_binds": True},
                 )
             ).replace("\n", "")
-            == "SELECT test_table_a.id FROM test_table_a JOIN test_table_b ON test_table_a.b_id = test_table_b.id WHERE test_table_b.id = 1 AND test_table_b.id = 2"
+            == "SELECT test_table_a.id FROM test_table_b JOIN test_table_c ON test_table_b.c_id = test_table_c.id, test_table_a WHERE test_table_b.id = 1 AND test_table_b.id = 2"
+        )
+
+    def test_enrich_stmt_select_with_initial_joins(self):
+        stmt = select(A.c.id).join_from(B, C, eq(B.c.c_id, C.c.id))
+        query = QuerySpec(
+            ClauseFactory.and_clauses(
+                [
+                    Clause(
+                        condition=eq(B.c.id, 1),
+                        joins=[join(B, C, eq(B.c.c_id, C.c.id))],
+                    ),
+                    Clause(
+                        condition=eq(B.c.id, 2),
+                        joins=[join(B, C, eq(B.c.c_id, C.c.id))],
+                    ),
+                ]
+            )
+        )
+        stmt = query.enrich_stmt(stmt)
+        assert (
+            str(
+                stmt.compile(
+                    dialect=postgresql.dialect(),
+                    compile_kwargs={"literal_binds": True},
+                )
+            ).replace("\n", "")
+            == "SELECT test_table_a.id FROM test_table_b JOIN test_table_c ON test_table_b.c_id = test_table_c.id, test_table_a WHERE test_table_b.id = 1 AND test_table_b.id = 2"
         )
 
     def test_enrich_stmt_select_update_redundant_joins(self):
