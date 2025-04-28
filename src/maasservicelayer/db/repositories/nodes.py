@@ -10,7 +10,7 @@ from sqlalchemy.sql.operators import eq
 from maascommon.enums.node import NodeTypeEnum
 from maasservicelayer.db.filters import Clause, ClauseFactory
 from maasservicelayer.db.repositories.base import BaseRepository
-from maasservicelayer.db.tables import BMCTable, NodeTable
+from maasservicelayer.db.tables import BMCTable, NodeConfigTable, NodeTable
 from maasservicelayer.models.bmc import Bmc
 from maasservicelayer.models.nodes import Node
 
@@ -92,3 +92,22 @@ class NodesRepository(AbstractNodesRepository[Node]):
 
     def get_model_factory(self) -> Type[Node]:
         return Node
+
+    async def get_node_for_interface(
+        self, interface_node_config_id: int
+    ) -> Node | None:
+        stmt = (
+            select(NodeTable)
+            .select_from(NodeConfigTable)
+            .join(
+                NodeTable,
+                NodeTable.c.current_config_id == NodeConfigTable.c.id,
+            )
+            .filter(NodeConfigTable.c.id == interface_node_config_id)
+        )
+
+        result = (await self.execute_stmt(stmt)).one_or_none()
+        if not result:
+            return None
+
+        return Node(**result._asdict())

@@ -19,8 +19,10 @@ from maasservicelayer.exceptions.catalog import NotFoundException
 from maasservicelayer.models.nodes import Node
 from maasservicelayer.models.zones import Zone
 from tests.fixtures.factories.bmc import create_test_bmc
+from tests.fixtures.factories.interface import create_test_interface_entry
 from tests.fixtures.factories.machines import create_test_machine
 from tests.fixtures.factories.node import create_test_machine_entry
+from tests.fixtures.factories.node_config import create_test_node_config_entry
 from tests.fixtures.factories.user import create_test_user
 from tests.fixtures.factories.zone import create_test_zone
 from tests.maasapiserver.fixtures.db import Fixture
@@ -184,3 +186,25 @@ class TestNodesRepository:
 
         with pytest.raises(NotFoundException):
             await nodes_repository.update_by_id(id=-1, builder=builder)
+
+    async def test_get_node_for_interface(
+        self,
+        db_connection: AsyncConnection,
+        fixture: Fixture,
+    ) -> None:
+        bmc = await create_test_bmc(fixture)
+        user = await create_test_user(fixture)
+        machine = (
+            await create_test_machine(fixture, bmc=bmc, user=user)
+        ).dict()
+        config = await create_test_node_config_entry(fixture, node=machine)
+        machine["current_config_id"] = config["id"]
+        interface = await create_test_interface_entry(fixture, node=machine)
+
+        nodes_repository = NodesRepository(Context(connection=db_connection))
+
+        node = await nodes_repository.get_node_for_interface(
+            interface.node_config_id
+        )
+
+        assert node.id == machine["id"]

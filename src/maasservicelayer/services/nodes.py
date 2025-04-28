@@ -115,3 +115,10 @@ class NodesService(BaseService[Node, AbstractNodesRepository, NodeBuilder]):
                 )
 
         return node
+
+    async def get_node_for_interface(
+        self, interface_node_config_id: int
+    ) -> Node | None:
+        return await self.repository.get_node_for_interface(  # type: ignore
+            interface_node_config_id
+        )
