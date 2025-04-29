@@ -19,8 +19,10 @@ from maasservicelayer.exceptions.catalog import NotFoundException
 from maasservicelayer.models.nodes import Node
 from maasservicelayer.models.zones import Zone
 from tests.fixtures.factories.bmc import create_test_bmc
+from tests.fixtures.factories.interface import create_test_interface_entry
 from tests.fixtures.factories.machines import create_test_machine
 from tests.fixtures.factories.node import create_test_machine_entry
+from tests.fixtures.factories.node_config import create_test_node_config_entry
 from tests.fixtures.factories.user import create_test_user
 from tests.fixtures.factories.zone import create_test_zone
 from tests.maasapiserver.fixtures.db import Fixture

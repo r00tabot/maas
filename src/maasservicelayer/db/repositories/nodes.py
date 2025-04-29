@@ -10,7 +10,7 @@ from sqlalchemy.sql.operators import eq
 from maascommon.enums.node import NodeTypeEnum
 from maasservicelayer.db.filters import Clause, ClauseFactory
 from maasservicelayer.db.repositories.base import BaseRepository
-from maasservicelayer.db.tables import BMCTable, NodeTable
+from maasservicelayer.db.tables import BMCTable, NodeConfigTable, NodeTable
 from maasservicelayer.models.bmc import Bmc
 from maasservicelayer.models.nodes import Node
 
@@ -39,6 +39,12 @@ class NodeClauseFactory(ClauseFactory):
     @classmethod
     def with_owner_id(cls, owner_id: int) -> Clause:
         return Clause(condition=eq(NodeTable.c.owner_id, owner_id))
+
+    @classmethod
+    def with_node_config_id(cls, node_config_id: int) -> Clause:
+        return Clause(
+            condition=eq(NodeTable.c.current_config_id, node_config_id)
+        )
 
 
 T = TypeVar("T", bound=Node)
