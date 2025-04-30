@@ -527,11 +527,12 @@ class FilesystemGroup(CleanSave, TimestampedModel):
             # Possible when no filesytems are attached to this group.
             return 0
         elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_0:
-            return self.get_total_size() - (
-                RAID_SUPERBLOCK_OVERHEAD * self.filesystems.count()
+            return int(
+                self.get_total_size()
+                - (RAID_SUPERBLOCK_OVERHEAD * self.filesystems.count())
             )
         elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_1:
-            return min_size - RAID_SUPERBLOCK_OVERHEAD
+            return int(min_size - RAID_SUPERBLOCK_OVERHEAD)
         else:
             num_raid = len(
                 [
@@ -541,11 +542,17 @@ class FilesystemGroup(CleanSave, TimestampedModel):
                 ]
             )
             if self.group_type == FILESYSTEM_GROUP_TYPE.RAID_5:
-                return (min_size * (num_raid - 1)) - RAID_SUPERBLOCK_OVERHEAD
+                return int(
+                    (min_size * (num_raid - 1)) - RAID_SUPERBLOCK_OVERHEAD
+                )
             elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_6:
-                return (min_size * (num_raid - 2)) - RAID_SUPERBLOCK_OVERHEAD
+                return int(
+                    (min_size * (num_raid - 2)) - RAID_SUPERBLOCK_OVERHEAD
+                )
             elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_10:
-                return (min_size * num_raid / 2) - RAID_SUPERBLOCK_OVERHEAD
+                return int(
+                    (min_size * num_raid / 2) - RAID_SUPERBLOCK_OVERHEAD
+                )
         raise ValidationError("Unknown raid type: %s" % self.group_type)
 
     def get_bcache_backing_filesystem(self):
