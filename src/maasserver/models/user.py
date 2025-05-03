@@ -1,4 +1,4 @@
-# Copyright 2012-2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2012-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """MAAS-specific helpers for :class:`User`."""
@@ -13,7 +13,7 @@ __all__ = [
 
 from piston3.models import Consumer, Token
 
-from maasserver import worker_user
+from maascommon.enums.users import GENERIC_CONSUMER, MAAS_USER_USERNAME
 from metadataserver import nodeinituser
 
 # Special users internal to MAAS.
@@ -21,17 +21,15 @@ SYSTEM_USERS = [
     # For nodes' access to the metadata API:
     nodeinituser.user_name,
     # For node-group's workers to the MAAS API:
-    worker_user.user_name,
+    MAAS_USER_USERNAME,
 ]
-
-GENERIC_CONSUMER = "MAAS consumer"
 
 # Used for testing to prevent the creation of automatic authorisation token
 # when a user is created.
 SKIP_CREATE_AUTHORISATION_TOKEN = False
 
 
-def create_auth_token(user, consumer_name=None):
+def create_auth_token(user, consumer_name: str = GENERIC_CONSUMER):
     """Create new Token and Consumer (OAuth authorisation) for `user`.
 
     :param user: The user to create a token for.
@@ -42,8 +40,6 @@ def create_auth_token(user, consumer_name=None):
     :rtype: piston.models.Token
 
     """
-    if consumer_name is None:
-        consumer_name = GENERIC_CONSUMER
     consumer = Consumer.objects.create(
         user=user, name=consumer_name, status="accepted"
     )
