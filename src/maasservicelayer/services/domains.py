@@ -25,10 +25,12 @@ from maasservicelayer.exceptions.constants import (
     CANNOT_DELETE_DEFAULT_DOMAIN_VIOLATION_TYPE,
     UNEXISTING_RESOURCE_VIOLATION_TYPE,
 )
-from maasservicelayer.models.configurations import MAASInternalDomainConfig, DefaultDnsTtlConfig
+from maasservicelayer.models.configurations import (
+    DefaultDnsTtlConfig,
+    MAASInternalDomainConfig,
+)
 from maasservicelayer.models.domains import Domain
 from maasservicelayer.models.forwarddnsserver import ForwardDNSServer
-from maasservicelayer.services import DatabaseConfigurationsService
 from maasservicelayer.models.nodes import Node
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.configurations import ConfigurationsService
@@ -69,7 +71,9 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
             if disallowed_chars:
                 raise ValueError("Domain name contains invalid characters.")
             raise ValueError("Invalid domain name.")
-        if name == await self.configurations_service.get(name=MAASInternalDomainConfig.name):
+        if name == await self.configurations_service.get(
+            name=MAASInternalDomainConfig.name
+        ):
             raise ValueError(
                 "Domain name cannot duplicate MAAS internal domain."
             )
@@ -138,7 +142,9 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
         raw_ttl: bool = False,
         with_node_id: bool = False,
     ) -> dict[str, HostnameIPMapping]:
-        default_ttl = await self.configurations_service.get(name=DefaultDnsTtlConfig.name)
+        default_ttl = await self.configurations_service.get(
+            name=DefaultDnsTtlConfig.name
+        )
         return await self.repository.get_hostname_ip_mapping(
             default_ttl, domain_id, raw_ttl, with_node_id
         )
@@ -150,7 +156,9 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
         with_ids=True,
         with_node_id: bool = False,
     ) -> dict[str, HostnameRRsetMapping]:
-        default_ttl = await self.configurations_service.get(name=DefaultDnsTtlConfig.name)
+        default_ttl = await self.configurations_service.get(
+            name=DefaultDnsTtlConfig.name
+        )
         return await self.repository.get_hostname_dnsdata_mapping(
             domain_id, default_ttl, raw_ttl, with_ids, with_node_id
         )

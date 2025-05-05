@@ -7,8 +7,12 @@ from typing import Any
 
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.secrets import SecretsRepository
+from maasservicelayer.models.configurations import VaultEnabledConfig
 from maasservicelayer.services.base import Service, ServiceCache
-from maasservicelayer.services.configurations import ConfigurationsService
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationNotFound,
+    DatabaseConfigurationsService,
+)
 from maasservicelayer.vault.api.models.exceptions import VaultNotFoundException
 from maasservicelayer.vault.manager import (
     AsyncVaultManager,
@@ -172,7 +176,6 @@ class SecretsServiceFactory:
     The factory reads the configuration only once and caches the result for future requests.
     """
 
-    VAULT_CONFIG_NAME = "vault_enabled"
     IS_VAULT_ENABLED = None
 
     @classmethod
@@ -195,10 +198,13 @@ class SecretsServiceFactory:
         is required to re-evaluate the Vault settings.
         """
         if cls.IS_VAULT_ENABLED is None:
-            result = await database_configurations_service.get(
-                cls.VAULT_CONFIG_NAME
-            )
-            cls.IS_VAULT_ENABLED = result if result else False
+            try:
+                result = await database_configurations_service.get(
+                    VaultEnabledConfig.name
+                )
+            except DatabaseConfigurationNotFound:
+                result = VaultEnabledConfig.default
+            cls.IS_VAULT_ENABLED = result
         if cls.IS_VAULT_ENABLED:
             return VaultSecretsService(context=context, cache=cache)
         return LocalSecretsStorageService(context=context, cache=cache)

@@ -73,6 +73,9 @@ from maasservicelayer.services.agents import AgentsService
 from maasservicelayer.services.auth import AuthService
 from maasservicelayer.services.base import ServiceCache
 from maasservicelayer.services.configurations import ConfigurationsService
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationsService,
+)
 from maasservicelayer.services.dhcpsnippets import DhcpSnippetsService
 from maasservicelayer.services.discoveries import DiscoveriesService
 from maasservicelayer.services.dnsdata import DNSDataService
@@ -82,9 +85,6 @@ from maasservicelayer.services.dnsresourcerecordsets import (
 )
 from maasservicelayer.services.dnsresources import DNSResourcesService
 from maasservicelayer.services.domains import DomainsService
-from maasservicelayer.services.database_configurations import (
-    DatabaseConfigurationsService,
-)
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.external_auth import ExternalAuthService
 from maasservicelayer.services.fabrics import FabricsService
@@ -208,6 +208,11 @@ class ServiceCollectionV3:
         cache: CacheForServices,
     ) -> Self:
         services = cls()
+        services.events = EventsService(
+            context=context,
+            events_repository=EventsRepository(context),
+            eventtypes_repository=EventTypesRepository(context),
+        )
         services.database_configurations = DatabaseConfigurationsService(
             context=context,
             database_configurations_repository=DatabaseConfigurationsRepository(
@@ -228,18 +233,14 @@ class ServiceCollectionV3:
         services.configurations = ConfigurationsService(
             context=context,
             database_configurations_service=services.database_configurations,
-            secrets_service=services.secrets
+            secrets_service=services.secrets,
+            events_service=services.events,
         )
         services.temporal = TemporalService(
             context=context,
             cache=cache.get(
                 TemporalService.__name__, TemporalService.build_cache_object
             ),
-        )
-        services.events = EventsService(
-            context=context,
-            events_repository=EventsRepository(context),
-            eventtypes_repository=EventTypesRepository(context),
         )
         services.scriptresults = ScriptResultsService(
             context=context,
@@ -284,7 +285,6 @@ class ServiceCollectionV3:
         services.staticipaddress = StaticIPAddressService(
             context=context,
             temporal_service=services.temporal,
-            configurations_service=services.configurations,
             staticipaddress_repository=StaticIPAddressRepository(context),
         )
         services.dhcpsnippets = DhcpSnippetsService(

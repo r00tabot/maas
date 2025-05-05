@@ -4,10 +4,8 @@
 """Configuration items."""
 
 from collections import namedtuple
-from contextlib import suppress
 import uuid
 
-from django.contrib.auth.models import AnonymousUser
 from django.db.models import CharField, JSONField, Manager, Model
 
 from maascommon.workflows.dhcp import (
@@ -79,39 +77,6 @@ class ConfigManager(Manager):
         exist.
         """
         return service_layer.services.configurations.get_many(names)
-        from maasserver.secrets import SecretManager, SecretNotFound
-
-        config_models = {
-            name: ConfigFactory.get_config_model(name)
-            for name in names
-            if name in ConfigFactory.ALL_CONFIGS
-        }
-
-        # Build a first result with all the default values, then look in the secrets/configs in the db for overrides.
-        configs = {
-            name: config_model.default
-            for name, config_model in config_models.items()
-        }
-
-        # What configs we should lookup from the DB
-        regular_configs = set(names)
-
-        # secrets configs
-        secret_manager = SecretManager()
-        for name, model in config_models.items():
-            if model.stored_as_secret:
-                with suppress(SecretNotFound):
-                    configs[name] = secret_manager.get_simple_secret(
-                        model.secret_name
-                    )
-                    # The config was found and added to the result: remove it from the regular config.
-                    regular_configs.remove(name)
-
-        # Lookup the remaining configs from the DB.
-        configs.update(
-            self.filter(name__in=regular_configs).values_list("name", "value")
-        )
-        return configs
 
     def set_config(self, name, value, endpoint=None, request=None):
         """Set or overwrite a config value.
@@ -125,7 +90,6 @@ class ConfigManager(Manager):
         :param request: The http request of the audit event to be created.
         :type request: HttpRequest object.
         """
-        return service_layer.services.configurations.set(name, value, None if isinstance(request.user, AnonymousUser) else request.user)
         from maasserver.audit import create_audit_event
         from maasserver.secrets import SecretManager
 

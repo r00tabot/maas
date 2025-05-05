@@ -11,7 +11,9 @@ from maasservicelayer.db.repositories.database_configurations import (
     DatabaseConfigurationsRepository,
 )
 from maasservicelayer.models.configurations import DatabaseConfiguration
-from maasservicelayer.services import DatabaseConfigurationsService
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationsService,
+)
 
 
 @pytest.mark.asyncio

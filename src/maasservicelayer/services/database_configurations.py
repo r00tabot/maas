@@ -11,11 +11,20 @@ from maasservicelayer.db.repositories.database_configurations import (
 from maasservicelayer.services.base import Service
 
 
+class DatabaseConfigurationNotFound(Exception):
+    """Raised when a configuration is not found in the database."""
+
+    def __init__(self, name: str):
+        self.name = name
+        super().__init__(f"DatabaseConfiguration '{name}' not found")
+
+
 class DatabaseConfigurationsService(Service):
     """
     This service is used only to fetch configurations from the DB!
     Most of the times you want to use the `maasservicelayer.services.entities.configurations service instead.
     """
+
     def __init__(
         self,
         context: Context,
@@ -28,6 +37,8 @@ class DatabaseConfigurationsService(Service):
 
     async def get(self, name: str) -> Any:
         configuration = await self.database_configurations_repository.get(name)
+        if not configuration:
+            raise DatabaseConfigurationNotFound(name)
         return configuration.value
 
     async def get_many(self, query: QuerySpec) -> dict[str, Any]:

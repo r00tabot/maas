@@ -23,8 +23,8 @@ from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.configurations import MAASInternalDomainConfig
 from maasservicelayer.models.domains import Domain
 from maasservicelayer.models.nodes import Node
-from maasservicelayer.services import ConfigurationsService
 from maasservicelayer.services.base import BaseService
+from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.dnspublications import DNSPublicationsService
 from maasservicelayer.services.domains import DomainsService
 from maasservicelayer.services.users import UsersService

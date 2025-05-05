@@ -10,14 +10,6 @@ from maasservicelayer.db.tables import ConfigTable
 from maasservicelayer.models.configurations import DatabaseConfiguration
 
 
-class DatabaseConfigurationNotFound(Exception):
-    """Raised when a configuration is not found in the database."""
-
-    def __init__(self, name: str):
-        self.name = name
-        super().__init__(f"DatabaseConfiguration '{name}' not found")
-
-
 class DatabaseConfigurationsClauseFactory(ClauseFactory):
     @classmethod
     def with_names(cls, names: set[str]) -> Clause:
@@ -25,7 +17,7 @@ class DatabaseConfigurationsClauseFactory(ClauseFactory):
 
 
 class DatabaseConfigurationsRepository(Repository):
-    async def get(self, name: str) -> DatabaseConfiguration:
+    async def get(self, name: str) -> DatabaseConfiguration | None:
         stmt = (
             select(
                 "*",
@@ -35,7 +27,7 @@ class DatabaseConfigurationsRepository(Repository):
         )
         result = (await self.execute_stmt(stmt)).one_or_none()
         if result is None:
-            raise DatabaseConfigurationNotFound(name)
+            return None
         return DatabaseConfiguration(**result._asdict())
 
     async def get_many(self, query: QuerySpec) -> list[DatabaseConfiguration]:

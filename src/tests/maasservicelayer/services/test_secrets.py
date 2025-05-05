@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.secrets import SecretsRepository
 from maasservicelayer.models.secrets import Secret
-from maasservicelayer.services import DatabaseConfigurationsService
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationsService,
+)
 from maasservicelayer.services.secrets import (
     LocalSecretsStorageService,
     SecretNotFound,

@@ -1,27 +1,23 @@
 #  Copyright 2025 Canonical Ltd.  This software is licensed under the
 #  GNU Affero General Public License version 3 (see the file LICENSE).
 from contextlib import suppress
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
-from deprecated import deprecated
 import structlog
 
-from maascommon.enums.events import EventTypeEnum
-from maasservicelayer.builders.events import EventBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.database_configurations import (
-    DatabaseConfigurationNotFound,
     DatabaseConfigurationsClauseFactory,
 )
 from maasservicelayer.models.configurations import Config, ConfigFactory
-from maasservicelayer.models.events import EventType
-from maasservicelayer.services import (
-    SecretsService, EventsService,
-)
 from maasservicelayer.services.base import Service
-from maasservicelayer.services.database_configurations import DatabaseConfigurationsService
-from maasservicelayer.services.secrets import SecretNotFound
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationNotFound,
+    DatabaseConfigurationsService,
+)
+from maasservicelayer.services.events import EventsService
+from maasservicelayer.services.secrets import SecretNotFound, SecretsService
 
 T = TypeVar("T", bound=Config)
 
@@ -32,7 +28,7 @@ class ConfigurationsService(Service):
         context: Context,
         database_configurations_service: DatabaseConfigurationsService,
         secrets_service: SecretsService,
-        events_service: EventsService
+        events_service: EventsService,
     ):
         super().__init__(context)
         self.database_configurations_service = database_configurations_service
@@ -67,7 +63,7 @@ class ConfigurationsService(Service):
                 return await self.secrets_service.get_simple_secret(
                     config_model.secret_name
                 )
-            return self.database_configurations_service.get(name=name)
+            return await self.database_configurations_service.get(name=name)
         except (DatabaseConfigurationNotFound, SecretNotFound):
             return default_value
 
@@ -96,7 +92,9 @@ class ConfigurationsService(Service):
         for name, model in config_models.items():
             if model.stored_as_secret:
                 with suppress(SecretNotFound):
-                    configs[name] = await self.secrets_service.get_simple_secret(
+                    configs[
+                        name
+                    ] = await self.secrets_service.get_simple_secret(
                         model.secret_name
                     )
                     # The config was found and added to the result: remove it from the regular config.
@@ -113,38 +111,3 @@ class ConfigurationsService(Service):
             )
         )
         return configs
-
-    async def set(self, name: str, value: Any, user=None):
-        """Set or overwrite a config value.
-
-        :param name: The name of the config item to set.
-        :type name: unicode
-        :param value: The value of the config item to set.
-        :type value: Any jsonizable object
-        :param endpoint: The endpoint of the audit event to be created.
-        :type endpoint: Integer enumeration of ENDPOINT.
-        :param request: The http request of the audit event to be created.
-        :type request: HttpRequest object.
-        """
-        config_model = None
-        try:
-            config_model = ConfigFactory.get_config_model(name)
-        except ValueError:
-            structlog.warn(
-                f"The configuration '{name}' is not known. Anyways, it's going to be stored in the DB."
-            )
-        if config_model and config_model.stored_as_secret:
-            await self.secrets_service.set_simple_secret(
-                config_model.secret_name, value
-            )
-        else:
-            self.update_or_create(name=name, defaults={"value": value})
-        structlog.info(f"Configuration '{name}' has been updated.")
-
-        # TODO CLEAR SESSIONS
-
-        await self.events_service.record_event(
-            event_type=EventTypeEnum.SETTINGS,
-            event_description=f"Updated configuration setting '{name}' to '{value}'.",
-            user=user,
-        )
