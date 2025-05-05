@@ -60,6 +60,7 @@ class ConfigurationsService(Service):
             default_value = config_model.default
         try:
             if config_model and config_model.stored_as_secret:
+                assert config_model.secret_name is not None
                 return await self.secrets_service.get_simple_secret(
                     config_model.secret_name
                 )
@@ -92,6 +93,7 @@ class ConfigurationsService(Service):
         for name, model in config_models.items():
             if model.stored_as_secret:
                 with suppress(SecretNotFound):
+                    assert model.secret_name is not None
                     configs[
                         name
                     ] = await self.secrets_service.get_simple_secret(
