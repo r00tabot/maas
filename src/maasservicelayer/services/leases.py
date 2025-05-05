@@ -8,9 +8,11 @@ from pydantic import IPvAnyAddress
 import structlog
 
 from maascommon.enums.ipaddress import IpAddressType, LeaseAction
+from maascommon.utils.network import coerce_to_valid_hostname
 from maasservicelayer.builders.staticipaddress import StaticIPAddressBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import ClauseFactory, QuerySpec
+from maasservicelayer.db.repositories.nodes import NodeClauseFactory
 from maasservicelayer.db.repositories.staticipaddress import (
     StaticIPAddressClauseFactory,
 )
@@ -115,10 +117,13 @@ class LeasesService(Service):
                 interfaces = [
                     (
                         await self.interface_service.create_unkwnown_interface(
-                            lease.mac, subnet.vlan_id
+                            mac=lease.mac, vlan_id=subnet.vlan_id
                         )
                     )
                 ]
+            else:
+                # No interfaces and not commit action so nothing needs to be done.
+                return
 
         sip = None
         # Delete all discovered IP addresses attached to all interfaces of the same
@@ -134,10 +139,10 @@ class LeasesService(Service):
                     await self.dnsresource_service.release_dynamic_hostname(
                         address
                     )
-                    await self.staticipaddress_service.delete_by_id(address.id)
-                else:
-                    # Avoid recreating a new StaticIPAddress later.
-                    sip = address
+                await self.staticipaddress_service.delete_by_id(address.id)
+            else:
+                # Avoid recreating a new StaticIPAddress later.
+                sip = address
 
         # Create the new StaticIPAddress object based on the action.
         match lease.action:
@@ -182,14 +187,17 @@ class LeasesService(Service):
             )
         )
 
-        for interface in interfaces:
-            await self.interface_service.link_ip([interface], sip)
+        await self.interface_service.link_ip(interfaces, sip)
         if sip_hostname is not None:
             # MAAS automatically manages DNS for node hostnames, so we cannot allow a DHCP client to override that.
-            node_with_hostname_exists = (
-                await self.node_service.hostname_exists(sip_hostname)
+            hostname_belongs_to_a_node = await self.node_service.exists(
+                query=QuerySpec(
+                    where=NodeClauseFactory.with_hostname(
+                        hostname=coerce_to_valid_hostname(sip_hostname)
+                    )
+                )
             )
-            if node_with_hostname_exists:
+            if hostname_belongs_to_a_node:
                 # Ensure we don't allow a DHCP hostname to override a node hostname.
                 await self.dnsresource_service.release_dynamic_hostname(sip)
             else:
@@ -206,7 +214,7 @@ class LeasesService(Service):
         if sip is None:
             # XXX: There shouldn't be more than one StaticIPAddress
             #      record here, but it can happen be due to bug 1817305.
-            sip = await self.staticipaddress_service.get_one(
+            sips = await self.staticipaddress_service.get_many(
                 query=QuerySpec(
                     where=ClauseFactory.and_clauses(
                         [
@@ -226,6 +234,9 @@ class LeasesService(Service):
                     )
                 )
             )
+            sip = next(
+                iter(sips), None
+            )  # just pick the first one in case multiple results are returned.
             if sip is None:
                 sip = await self.staticipaddress_service.create(
                     StaticIPAddressBuilder(

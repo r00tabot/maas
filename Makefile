@@ -78,7 +78,7 @@ all: build ui go-bins doc
 .PHONY: all
 
 
-$(BIN_DIR)/golangci-lint: GOLANGCI_VERSION=1.60.1
+$(BIN_DIR)/golangci-lint: GOLANGCI_VERSION=2.0.2
 $(BIN_DIR)/golangci-lint: utilities/get_golangci-lint | $(BIN_DIR)
 	GOBIN="$(realpath $(dir $@))"
 	utilities/get_golangci-lint "v$(GOLANGCI_VERSION)"
@@ -148,12 +148,8 @@ build-agent:
 	$(MAKE) --no-print-directory -j -C src/maasagent build
 .PHONY: build-agent
 
-test: test-missing-migrations test-py lint-oapi test-go
+test: test-py lint-oapi test-go
 .PHONY: test
-
-test-missing-migrations: bin/database bin/maas-region
-	$(dbrun) bin/maas-region makemigrations --check --dry-run
-.PHONY: test-missing-migrations
 
 test-py: bin/test.parallel bin/subunit-1to2 bin/subunit2junitxml bin/subunit2pyunit bin/pytest
 	@utilities/run-py-tests-ci

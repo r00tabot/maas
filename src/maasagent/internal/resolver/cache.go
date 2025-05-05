@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	maxRecordSize         = 512
-	defaultCacheRecordCap = 1000
+	maxRecordSize        = 512
+	defaultMaxNumRecords = 1000
 )
 
 type Cache interface {
@@ -37,53 +37,79 @@ type cacheEntry struct {
 	CreatedAt time.Time
 }
 
-func (c *cacheEntry) Expired(ts time.Time) bool {
+// Expired calculates if an entry has reached its TTL
+func (c *cacheEntry) expired(ts time.Time) bool {
 	ttl := c.RR.Header().Ttl
 
 	return ts.Sub(c.CreatedAt) >= time.Duration(ttl)*time.Second
 }
 
+type CacheOption func(*cache)
+
 type cache struct {
-	cache *lru.Cache[string, *cacheEntry]
+	cache         *lru.Cache[string, *cacheEntry]
+	stats         *cacheStats
+	maxNumRecords int
 }
 
-func NewCache(size int64) (Cache, error) {
-	maxNumRecords := defaultCacheRecordCap
-
-	if size != 0 {
-		maxNumRecords = int(size / maxRecordSize)
-		if maxNumRecords < 1 {
-			maxNumRecords = 1
-		}
+// NewCache provides a constructor for an in-memory DNS cache
+func NewCache(options ...CacheOption) (Cache, error) {
+	c := &cache{
+		stats:         &cacheStats{},
+		maxNumRecords: defaultMaxNumRecords,
 	}
 
-	lruCache, err := lru.New[string, *cacheEntry](maxNumRecords)
+	for _, option := range options {
+		option(c)
+	}
+
+	lruCache, err := lru.New[string, *cacheEntry](c.maxNumRecords)
 	if err != nil {
 		return nil, err
 	}
 
-	return &cache{
-		cache: lruCache,
-	}, nil
+	c.cache = lruCache
+
+	return c, nil
 }
 
+// WithMaxSize allows setting the maximum cache size in bytes. By default it is
+// limited to defaultMaxNumRecords (1000), but if WithMaxSize is provided, then
+// it is calculated as maxNumRecords = size / maxRecordSize (512 bytes)
+func WithMaxSize(size int64) CacheOption {
+	return func(c *cache) {
+		if size != 0 {
+			c.maxNumRecords = max(int(size/maxRecordSize), 1)
+		}
+	}
+}
+
+// Get fetches a record for the given name and type if one is present
+// in the cache, returns false if one is absent or expired
 func (c *cache) Get(name string, rrtype uint16) (dns.RR, bool) {
 	key := c.key(name, rrtype)
 
 	entry, ok := c.cache.Get(key)
 	if !ok {
+		c.stats.misses.Add(1)
+
 		return nil, ok
 	}
 
-	if entry.Expired(time.Now()) {
+	if entry.expired(time.Now()) {
 		_ = c.cache.Remove(key)
+
+		c.stats.expirations.Add(1)
 
 		return nil, false
 	}
 
+	c.stats.hits.Add(1)
+
 	return entry.RR, ok
 }
 
+// Set inserts a record into the cache
 func (c *cache) Set(rr dns.RR) {
 	hdr := rr.Header()
 	key := c.key(hdr.Name, hdr.Rrtype)
@@ -94,6 +120,7 @@ func (c *cache) Set(rr dns.RR) {
 	})
 }
 
+// key generates the key for a record in the cache
 func (c *cache) key(name string, rrtype uint16) string {
 	return name + "_" + dns.TypeToString[rrtype]
 }

@@ -13,6 +13,12 @@ from hypothesis import given, settings
 from hypothesis.strategies import integers
 from netaddr import AddrFormatError, IPAddress, IPNetwork
 
+from maascommon.utils.network import (
+    inet_ntop,
+    IPRANGE_PURPOSE,
+    MAASIPRange,
+    MAASIPSet,
+)
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -40,7 +46,6 @@ from maasserver.testing.orm import rollback
 from maasserver.testing.testcase import MAASServerTestCase
 from maasserver.utils.orm import get_one, post_commit_hooks, reload_object
 from maastesting.djangotestcase import count_queries
-from provisioningserver.utils.network import inet_ntop, MAASIPRange
 
 
 class TestCreateCidr(MAASServerTestCase):
@@ -913,20 +918,6 @@ class TestSubnetIPRange(MAASServerTestCase):
         self.assertIn(static_range_low, s)
         self.assertNotIn(static_range_high, s)
 
-    def test_finds_used_ranges_ignores_discovered_ip(self):
-        subnet = factory.make_Subnet(
-            gateway_ip="", dns_servers=[], host_bits=8
-        )
-        net = subnet.get_ipnetwork()
-        static_range_low = inet_ntop(net.first + 50)
-        static_range_high = inet_ntop(net.first + 99)
-        factory.make_StaticIPAddress(
-            ip=static_range_low, alloc_type=IPADDRESS_TYPE.DISCOVERED
-        )
-        s = subnet.get_ipranges_in_use(ignore_discovered_ips=True)
-        self.assertNotIn(static_range_low, s)
-        self.assertNotIn(static_range_high, s)
-
     def test_get_ipranges_not_in_use_includes_free_ips(self):
         subnet = factory.make_Subnet(
             gateway_ip="", dns_servers=[], host_bits=8
@@ -955,39 +946,6 @@ class TestSubnetIPRange(MAASServerTestCase):
         self.assertNotIn(static_range_low, s)
         self.assertIn(static_range_high, s)
 
-    def test_get_ipranges_not_in_use_ignores_discovered_ip(self):
-        subnet = factory.make_Subnet(
-            gateway_ip="", dns_servers=[], host_bits=8
-        )
-        net = subnet.get_ipnetwork()
-        static_range_low = inet_ntop(net.first + 50)
-        static_range_high = inet_ntop(net.first + 99)
-        factory.make_StaticIPAddress(
-            ip=static_range_low, alloc_type=IPADDRESS_TYPE.DISCOVERED
-        )
-        s = subnet.get_ipranges_not_in_use(ignore_discovered_ips=True)
-        self.assertIn(static_range_low, s)
-        self.assertIn(static_range_high, s)
-
-    def test_get_ipranges_not_in_use_excludes_ip_range(self):
-        subnet = factory.make_Subnet(
-            gateway_ip="", dns_servers=[], host_bits=8
-        )
-        net = subnet.get_ipnetwork()
-        static_range_low = inet_ntop(net.first + 50)
-        static_range_high = inet_ntop(net.first + 99)
-        ip_range = factory.make_IPRange(
-            subnet=subnet,
-            start_ip=static_range_low,
-            end_ip=static_range_high,
-            alloc_type=IPRANGE_TYPE.RESERVED,
-        )
-        s = subnet.get_ipranges_not_in_use(
-            ignore_discovered_ips=True, exclude_ip_ranges=[ip_range]
-        )
-        self.assertIn(static_range_low, s)
-        self.assertIn(static_range_high, s)
-
     def test_get_iprange_usage_includes_used_and_unused_ips(self):
         subnet = factory.make_Subnet(
             gateway_ip="", dns_servers=[], host_bits=8
@@ -995,6 +953,12 @@ class TestSubnetIPRange(MAASServerTestCase):
         net = subnet.get_ipnetwork()
         static_range_low = inet_ntop(net.first + 50)
         static_range_high = inet_ntop(net.first + 99)
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip=static_range_low,
+            end_ip=static_range_high,
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
         factory.make_StaticIPAddress(
             ip=static_range_low, alloc_type=IPADDRESS_TYPE.USER_RESERVED
         )
@@ -1016,25 +980,652 @@ class TestSubnetIPRange(MAASServerTestCase):
         self.assertIn(gateway_ip_1, s)
         self.assertIn(gateway_ip_2, s)
 
-    def get__get_iprange_usage_includes_neighbours_on_request(self):
+    def test_get_iprange_usage_excludes_neighbours(self):
         subnet = factory.make_Subnet(
             cidr="10.0.0.0/30", gateway_ip=None, dns_servers=None
         )
         rackif = factory.make_Interface(vlan=subnet.vlan)
         factory.make_Discovery(ip="10.0.0.1", interface=rackif)
-        iprange = subnet.get_iprange_usage(with_neighbours=True)
-        self.assertIn(MAASIPRange("10.0.0.1", purpose="neighbour"), iprange)
+        iprange = subnet.get_iprange_usage()
+        self.assertIn(
+            MAASIPRange("10.0.0.1", purpose=IPRANGE_PURPOSE.UNUSED), iprange
+        )
 
-    def get__get_iprange_usage_excludes_neighbours_by_default(self):
+    def test_get_ipranges_not_in_use_reserved_and_dynamic_ranges(self):
+        subnet = factory.make_Subnet(cidr="10.10.0.0/24")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.1",
+            end_ip="10.10.0.2",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.3",
+            end_ip="10.10.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.5",
+            end_ip="10.10.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        ipranges = subnet.get_ipranges_not_in_use()
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.10",
+                    "10.10.0.254",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                )
+            ]
+        )
+
+    def test_get_ipranges_in_use_complete_case_managed(self):
         subnet = factory.make_Subnet(
-            cidr="10.0.0.0/30", gateway_ip=None, dns_servers=None
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.100",
+            end_ip="10.10.0.110",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
         )
         rackif = factory.make_Interface(vlan=subnet.vlan)
-        factory.make_Discovery(ip="10.0.0.1", interface=rackif)
-        iprange = subnet.get_iprange_usage(with_neighbours=True)
-        self.assertNotIn(
-            MAASIPRange("10.0.0.1", purpose="neighbour"),
-            iprange,
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        in_use = subnet.get_ipranges_in_use()
+        # neighbours are not included by default
+        assert in_use == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.1",
+                    "10.10.0.1",
+                    purpose={IPRANGE_PURPOSE.GATEWAY_IP},
+                ),
+                MAASIPRange(
+                    "10.10.0.2",
+                    "10.10.0.2",
+                    purpose={IPRANGE_PURPOSE.DNS_SERVER},
+                ),
+                MAASIPRange(
+                    "10.10.0.3",
+                    "10.10.0.3",
+                    purpose={IPRANGE_PURPOSE.GATEWAY_IP},
+                ),
+                MAASIPRange(
+                    "10.10.0.8",
+                    "10.10.0.12",
+                    purpose={IPRANGE_PURPOSE.RESERVED},
+                ),
+                MAASIPRange(
+                    "10.10.0.20",
+                    "10.10.0.20",
+                    purpose={IPRANGE_PURPOSE.ASSIGNED_IP},
+                ),
+                MAASIPRange(
+                    "10.10.0.100",
+                    "10.10.0.110",
+                    purpose={IPRANGE_PURPOSE.DYNAMIC},
+                ),
+            ]
+        )
+        free_ranges = subnet.get_ipranges_not_in_use()
+        assert free_ranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.4", "10.10.0.7", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.13",
+                    "10.10.0.19",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+                MAASIPRange(
+                    "10.10.0.21",
+                    "10.10.0.99",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+                MAASIPRange(
+                    "10.10.0.111",
+                    "10.10.0.254",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
+        )
+
+    def test_get_ipranges_in_use_complete_case_unmanaged(self):
+        subnet = factory.make_Subnet(
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+            managed=False,
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        # can make a dynamic range only on a previously reserved range
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.10",
+            end_ip="10.10.0.11",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        in_use = subnet.get_ipranges_in_use()
+        assert in_use == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.1",
+                    "10.10.0.1",
+                    purpose={IPRANGE_PURPOSE.GATEWAY_IP},
+                ),
+                MAASIPRange(
+                    "10.10.0.2",
+                    "10.10.0.2",
+                    purpose={IPRANGE_PURPOSE.DNS_SERVER},
+                ),
+                MAASIPRange(
+                    "10.10.0.3",
+                    "10.10.0.3",
+                    purpose={IPRANGE_PURPOSE.GATEWAY_IP},
+                ),
+                MAASIPRange(
+                    "10.10.0.8",
+                    "10.10.0.12",
+                    purpose={
+                        IPRANGE_PURPOSE.RESERVED,
+                    },
+                ),
+                MAASIPRange(
+                    "10.10.0.10",
+                    "10.10.0.11",
+                    purpose={
+                        IPRANGE_PURPOSE.DYNAMIC,
+                    },
+                ),
+                MAASIPRange(
+                    "10.10.0.20",
+                    "10.10.0.20",
+                    purpose={IPRANGE_PURPOSE.ASSIGNED_IP},
+                ),
+            ]
+        )
+        # The free IP ranges for an unmanaged subnet are the ones which are
+        # reserved but not allocated
+        free_ranges = subnet.get_ipranges_not_in_use()
+        assert free_ranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.8", "10.10.0.9", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.12",
+                    "10.10.0.12",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
+        )
+
+
+class TestIPRangesAvailableForReservedRange(MAASServerTestCase):
+    def test_managed(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.2",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.5",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        ipranges = subnet.get_ipranges_available_for_reserved_range()
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.10", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                )
+            ]
+        )
+
+    def test_unmanaged(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24", managed=False)
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        ipranges = subnet.get_ipranges_available_for_reserved_range()
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.10", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+            ]
+        )
+
+    def test_exclude_ip_range_managed(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.2",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        excluded = factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.5",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        ipranges = subnet.get_ipranges_available_for_reserved_range(
+            exclude_ip_range_id=excluded.id
+        )
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.5", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                )
+            ]
+        )
+
+    def test_exclude_ip_range_unmanaged(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24", managed=False)
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        excluded = factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.10",
+            end_ip="10.0.0.20",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+
+        ipranges = subnet.get_ipranges_available_for_reserved_range(
+            exclude_ip_range_id=excluded.id
+        )
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.10", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+            ]
+        )
+
+
+class TestIPRangesAvailableForDynamicRange(MAASServerTestCase):
+    def test_managed(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.2",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.5",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        ipranges = subnet.get_ipranges_available_for_dynamic_range()
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.10", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                )
+            ]
+        )
+
+    def test_unmanaged_with_gateway_ip(self):
+        subnet = factory.make_Subnet(
+            cidr="10.0.0.0/24", gateway_ip="10.0.0.1", managed=False
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.10",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        ipranges = subnet.get_ipranges_available_for_dynamic_range()
+        # Gateway IP will be considered as in use
+        # can only make a dynamic range inside a reserved range
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.2", "10.0.0.2", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+                MAASIPRange(
+                    "10.0.0.5", "10.0.0.10", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+            ]
+        )
+
+    def test_unmanaged_without_gateway_ip(self):
+        subnet = factory.make_Subnet(
+            cidr="10.0.0.0/24", gateway_ip=None, managed=False
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.10",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        ipranges = subnet.get_ipranges_available_for_dynamic_range()
+        # can only make a dynamic range inside a reserved range
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.1", "10.0.0.2", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+                MAASIPRange(
+                    "10.0.0.5", "10.0.0.10", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+            ]
+        )
+
+    def test_exclude_ip_range_managed(self):
+        subnet = factory.make_Subnet(cidr="10.0.0.0/24")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.2",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        excluded = factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.5",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        ipranges = subnet.get_ipranges_available_for_dynamic_range(
+            exclude_ip_range_id=excluded.id
+        )
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.5", "10.0.0.254", purpose=IPRANGE_PURPOSE.UNUSED
+                )
+            ]
+        )
+
+    def test_exclude_ip_range_unmanaged(self):
+        subnet = factory.make_Subnet(
+            cidr="10.0.0.0/24", gateway_ip=None, managed=False
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.1",
+            end_ip="10.0.0.10",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.4",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        excluded = factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.0.0.5",
+            end_ip="10.0.0.9",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+
+        ipranges = subnet.get_ipranges_available_for_dynamic_range(
+            exclude_ip_range_id=excluded.id
+        )
+        assert ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.0.0.1", "10.0.0.2", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+                MAASIPRange(
+                    "10.0.0.5", "10.0.0.10", purpose=IPRANGE_PURPOSE.UNUSED
+                ),
+            ]
+        )
+
+
+class TestIPRangesAvailableForAllocation(MAASServerTestCase):
+    def test_find_available_reserved_ipranges_managed(self):
+        subnet = factory.make_Subnet(
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.13",
+            end_ip="10.10.0.18",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        free_ipranges = subnet.get_ipranges_available_for_reserved_range()
+        assert free_ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.1", "10.10.0.7", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.19",
+                    "10.10.0.254",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
+        )
+
+    def test_find_available_reserved_ipranges_unmanaged(self):
+        subnet = factory.make_Subnet(
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+            managed=False,
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        # can make a dynamic range only on a previously reserved range
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.10",
+            end_ip="10.10.0.11",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        free_ipranges = subnet.get_ipranges_available_for_reserved_range()
+        assert free_ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.1", "10.10.0.7", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.13",
+                    "10.10.0.254",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
+        )
+
+    def test_find_available_dynamic_ipranges_managed(self):
+        subnet = factory.make_Subnet(
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.13",
+            end_ip="10.10.0.18",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        free_ipranges = subnet.get_ipranges_available_for_dynamic_range()
+        assert free_ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.4", "10.10.0.7", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.19",
+                    "10.10.0.19",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+                MAASIPRange(
+                    "10.10.0.21",
+                    "10.10.0.254",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
+        )
+
+    def test_find_available_dynamic_ipranges_unmanaged(self):
+        subnet = factory.make_Subnet(
+            cidr="10.10.0.0/24",
+            gateway_ip="10.10.0.1",
+            dns_servers=["8.8.8.8", "10.10.0.2"],
+            managed=False,
+        )
+        factory.make_StaticRoute(source=subnet, gateway_ip="10.10.0.3")
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.8",
+            end_ip="10.10.0.12",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_StaticIPAddress(
+            ip="10.10.0.20", alloc_type=IPADDRESS_TYPE.USER_RESERVED
+        )
+        # can make a dynamic range only on a previously reserved range
+        factory.make_IPRange(
+            subnet=subnet,
+            start_ip="10.10.0.10",
+            end_ip="10.10.0.11",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        factory.make_Discovery(ip="10.10.0.30", interface=rackif)
+        free_ipranges = subnet.get_ipranges_available_for_dynamic_range()
+
+        # The free dynamic IP ranges for an unmanaged subnet are the ones which
+        # are reserved but not allocated
+        assert free_ipranges == MAASIPSet(
+            [
+                MAASIPRange(
+                    "10.10.0.8", "10.10.0.9", purpose={IPRANGE_PURPOSE.UNUSED}
+                ),
+                MAASIPRange(
+                    "10.10.0.12",
+                    "10.10.0.12",
+                    purpose={IPRANGE_PURPOSE.UNUSED},
+                ),
+            ]
         )
 
 
@@ -1252,29 +1843,6 @@ class TestSubnetGetRelatedRanges(MAASServerTestCase):
         )
 
 
-class TestSubnetGetMAASIPSetForNeighbours(MAASServerTestCase):
-    def test_returns_observed_neighbours(self):
-        subnet = factory.make_Subnet(
-            cidr="10.0.0.0/30", gateway_ip=None, dns_servers=None
-        )
-        rackif = factory.make_Interface(vlan=subnet.vlan)
-        factory.make_Discovery(ip="10.0.0.1", interface=rackif)
-        ipset = subnet.get_maasipset_for_neighbours()
-        self.assertIn("10.0.0.1", ipset)
-        self.assertNotIn("10.0.0.2", ipset)
-
-    def test_excludes_neighbours_with_static_ip_addresses(self):
-        subnet = factory.make_Subnet(
-            cidr="10.0.0.0/30", gateway_ip=None, dns_servers=None
-        )
-        rackif = factory.make_Interface(vlan=subnet.vlan)
-        factory.make_Discovery(ip="10.0.0.1", interface=rackif)
-        factory.make_StaticIPAddress(ip="10.0.0.1", cidr="10.0.0.0/30")
-        ipset = subnet.get_maasipset_for_neighbours()
-        self.assertNotIn("10.0.0.1", ipset)
-        self.assertNotIn("10.0.0.2", ipset)
-
-
 class TestSubnetGetLeastRecentlySeenUnknownNeighbour(MAASServerTestCase):
     def test_returns_least_recently_seen_neighbour(self):
         # Note: 10.0.0.0/30 --> 10.0.0.1 and 10.0.0.0.2 are usable.
@@ -1444,6 +2012,30 @@ class TestSubnetGetNextIPForAllocation(MAASServerTestCase):
         [ip] = subnet.get_next_ip_for_allocation()
         self.assertEqual("10.0.0.2", ip)
 
+    def test_avoids_dynamic_range(self):
+        # Note: 10.0.0.0/29 --> 10.0.0.1 through 10.0.0.6 are usable.
+        subnet = factory.make_Subnet(
+            cidr="10.0.0.0/29",
+            gateway_ip=None,
+            dns_servers=None,
+            managed=False,
+        )
+        factory.make_IPRange(
+            subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.6",
+            alloc_type=IPRANGE_TYPE.RESERVED,
+        )
+        factory.make_IPRange(
+            subnet,
+            start_ip="10.0.0.3",
+            end_ip="10.0.0.5",
+            alloc_type=IPRANGE_TYPE.DYNAMIC,
+        )
+        subnet = reload_object(subnet)
+        [ip] = subnet.get_next_ip_for_allocation()
+        assert ip == "10.0.0.6"
+
     def test_logs_if_suggests_previously_observed_neighbour(self):
         # Note: 10.0.0.0/30 --> 10.0.0.1 and 10.0.0.0.2 are usable.
         subnet = self.make_Subnet(
@@ -1463,6 +2055,22 @@ class TestSubnetGetNextIPForAllocation(MAASServerTestCase):
             logger.output,
             f"Next IP address to allocate from '.*' has been observed previously: 10.0.0.2 was last claimed by .* via .* on .* at {re.escape(str(yesterday))}.\n",
         )
+
+    def test_multiple_ips_requested_with_observed_neighbour(self):
+        # Note: 10.0.0.0/30 --> 10.0.0.1 and 10.0.0.2 are usable.
+        subnet = self.make_Subnet(
+            cidr="10.0.0.0/30", gateway_ip=None, dns_servers=None
+        )
+        rackif = factory.make_Interface(vlan=subnet.vlan)
+        dt_now = now()
+        yesterday = dt_now - timedelta(days=1)
+        factory.make_Discovery(ip="10.0.0.1", interface=rackif, updated=dt_now)
+        factory.make_Discovery(
+            ip="10.0.0.2", interface=rackif, updated=yesterday
+        )
+        result = subnet.get_next_ip_for_allocation(count=2)
+        # HEADS UP: this is wrong, the result should be 2!
+        assert len(result) == 1
 
     def test_uses_smallest_free_range_when_not_considering_neighbours(self):
         # Note: 10.0.0.0/29 --> 10.0.0.1 through 10.0.0.0.6 are usable.

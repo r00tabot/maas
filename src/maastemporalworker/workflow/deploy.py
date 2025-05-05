@@ -17,7 +17,6 @@ from temporalio.exceptions import (
     TimeoutError,
 )
 
-from maascommon.constants import NODE_TIMEOUT
 from maascommon.enums.node import NodeStatus
 from maascommon.enums.power import PowerState
 from maascommon.workflows.deploy import (
@@ -318,9 +317,6 @@ class DeployManyWorkflow:
 
     @workflow_run_with_context
     async def run(self, params: DeployManyParam) -> None:
-        # timeout of workflow is defined as 3 times the default node timeout
-        wf_timeout = 3 * NODE_TIMEOUT
-
         pending: list[workflow.ChildWorkflowHandle] = []
 
         for param in params.params:
@@ -332,7 +328,7 @@ class DeployManyWorkflow:
                 retry_policy=RetryPolicy(
                     maximum_interval=DEFAULT_DEPLOY_RETRY_TIMEOUT
                 ),
-                execution_timeout=timedelta(minutes=wf_timeout),
+                execution_timeout=timedelta(minutes=param.timeout),
             )
             pending.append(wf)
 
@@ -399,6 +395,7 @@ class DeployWorkflow:
                 driver_type=params.power_params.driver_type,
                 driver_opts=params.power_params.driver_opts,
                 task_queue=params.power_params.task_queue,
+                is_dpu=params.power_params.is_dpu,
             ),
             task_queue=params.power_params.task_queue,
             start_to_close_timeout=DEFAULT_DEPLOY_ACTIVITY_TIMEOUT,
@@ -415,6 +412,7 @@ class DeployWorkflow:
                     driver_type=params.power_params.driver_type,
                     driver_opts=params.power_params.driver_opts,
                     task_queue=params.power_params.task_queue,
+                    is_dpu=params.power_params.is_dpu,
                 ),
                 task_queue=params.power_params.task_queue,
                 start_to_close_timeout=DEFAULT_DEPLOY_ACTIVITY_TIMEOUT,
@@ -430,6 +428,7 @@ class DeployWorkflow:
                     driver_type=params.power_params.driver_type,
                     driver_opts=params.power_params.driver_opts,
                     task_queue=params.power_params.task_queue,
+                    is_dpu=params.power_params.is_dpu,
                 ),
                 task_queue=params.power_params.task_queue,
                 start_to_close_timeout=DEFAULT_DEPLOY_ACTIVITY_TIMEOUT,

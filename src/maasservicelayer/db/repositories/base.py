@@ -1,12 +1,11 @@
 #  Copyright 2024-2025 Canonical Ltd.  This software is licensed under the
 #  GNU Affero General Public License version 3 (see the file LICENSE).
+
 from abc import ABC, abstractmethod
 import ipaddress
-from ipaddress import IPv4Address, IPv6Address
 from operator import eq
 from typing import Any, Generic, List, Sequence, TypeVar
 
-from netaddr import IPAddress
 import psycopg2.extensions
 import psycopg2.extras
 from sqlalchemy import (
@@ -46,21 +45,6 @@ from maasservicelayer.models.base import (
 from maasservicelayer.utils.date import utcnow
 
 
-class MultipleResultsException(Exception):
-    pass
-
-
-T = TypeVar("T", bound=MaasBaseModel)
-
-
-def psycopg2_ipaddress_adapter(ip: IPv4Address | IPv6Address):
-    return psycopg2.extensions.AsIs(repr(ip.exploded))
-
-
-def psycopg2_netaddr_adapter(ip: IPAddress):
-    return psycopg2.extensions.AsIs(repr(str(ip)))
-
-
 def cast_ip(s, cur):
     if s is None:
         return None
@@ -71,6 +55,13 @@ def cast_cidr(s, cur):
     if s is None:
         return None
     return ipaddress.ip_network(str(s))
+
+
+class MultipleResultsException(Exception):
+    pass
+
+
+T = TypeVar("T", bound=MaasBaseModel)
 
 
 class Repository(ABC):  # noqa: B024
@@ -97,14 +88,16 @@ class Repository(ABC):  # noqa: B024
            - `asyncpg` automatically converts PostgreSQL `INET` and `CIDR`
              types to `ipaddress.IPv4Address`, `ipaddress.IPv6Address`,
              `ipaddress.IPv4Network`, or `ipaddress.IPv6Network`.
+             NOTE: this behaviour has been modified and now it converts
+             `INET` to `netaddr.IPAddress` and `CIDR` to `netaddr.IPNetwork`.
+             See src/maasservicelayer/db/__init__.py.
            - `psycopg2`, by default, returns these types as plain strings.
 
         Important:
         - Given that the service layer and its domain models are the future, we want to keep the default behavior of asyncpg
         and install/remove casters as needed for psycopg2.
-        - **DO NOT** use `register_adapter`, as it applies globally to all
-          connections, potentially causing race conditions.
-        - When you want to add more, find the pg_type with `SELECT * FROM pg_types`;
+        - If you have to use `register_adapter`, do so in maasserver/djangosettings/__init__.py as
+          it applies globally to all connections.
         """
         connection = self.context.get_connection()
         if isinstance(connection, Connection):
@@ -114,7 +107,6 @@ class Repository(ABC):  # noqa: B024
                 psycopg2.extras.register_default_jsonb(
                     conn_or_curs=connection.connection.dbapi_connection  # type: ignore
                 )
-
                 cidr = psycopg2.extensions.new_type((650,), "CIDR", cast_cidr)
                 inet = psycopg2.extensions.new_type((869,), "INET", cast_ip)
                 psycopg2.extensions.register_type(
@@ -134,7 +126,6 @@ class Repository(ABC):  # noqa: B024
                     conn_or_curs=connection.connection.dbapi_connection,  # type: ignore
                     loads=lambda x: x,
                 )
-
                 # Just return the string as is.
                 cidr = psycopg2.extensions.new_type(
                     (650,), "CIDR", lambda x, y: x
@@ -155,7 +146,7 @@ class Repository(ABC):  # noqa: B024
             return await connection.execute(stmt)
 
 
-class BaseRepository(Repository, Generic[T]):
+class ReadOnlyRepository(Repository, Generic[T]):
     def __init__(self, context: Context):
         super().__init__(context)
         self.mapper = self.get_mapper()
@@ -216,24 +207,6 @@ class BaseRepository(Repository, Generic[T]):
         result = (await self.execute_stmt(stmt)).all()
         return [self.get_model_factory()(**row._asdict()) for row in result]
 
-    async def create(self, builder: ResourceBuilder) -> T:
-        resource = self.mapper.build_resource(builder)
-        if self.has_timestamped_fields:
-            # Populate the fields only if the caller did not set them.
-            now = utcnow()
-            resource["created"] = resource.get("created", now)
-            resource["updated"] = resource.get("updated", now)
-        stmt = (
-            insert(self.get_repository_table())
-            .returning(self.get_repository_table())
-            .values(**resource.get_values())
-        )
-        try:
-            result = (await self.execute_stmt(stmt)).one()
-            return self.get_model_factory()(**result._asdict())
-        except IntegrityError:
-            self._raise_already_existing_exception()
-
     async def list(
         self, page: int, size: int, query: QuerySpec | None = None
     ) -> ListResult[T]:
@@ -258,6 +231,29 @@ class BaseRepository(Repository, Generic[T]):
             ],
             total=total,
         )
+
+
+class BaseRepository(ReadOnlyRepository[T], Generic[T]):
+    def __init__(self, context: Context):
+        super().__init__(context)
+
+    async def create(self, builder: ResourceBuilder) -> T:
+        resource = self.mapper.build_resource(builder)
+        if self.has_timestamped_fields:
+            # Populate the fields only if the caller did not set them.
+            now = utcnow()
+            resource["created"] = resource.get("created", now)
+            resource["updated"] = resource.get("updated", now)
+        stmt = (
+            insert(self.get_repository_table())
+            .returning(self.get_repository_table())
+            .values(**resource.get_values())
+        )
+        try:
+            result = (await self.execute_stmt(stmt)).one()
+            return self.get_model_factory()(**result._asdict())
+        except IntegrityError:
+            self._raise_already_existing_exception()
 
     async def update_many(
         self, query: QuerySpec, builder: ResourceBuilder
