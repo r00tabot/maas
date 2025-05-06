@@ -35,7 +35,7 @@ DEFAULT_OS = UbuntuOS()
 
 
 @generate_builder()
-class Configuration(MaasBaseModel):
+class DatabaseConfiguration(MaasBaseModel):
     name: str
     value: Any
 

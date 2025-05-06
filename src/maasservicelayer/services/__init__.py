@@ -4,8 +4,8 @@
 from typing import Callable, Self
 
 from maasservicelayer.context import Context
-from maasservicelayer.db.repositories.configurations import (
-    ConfigurationsRepository,
+from maasservicelayer.db.repositories.database_configurations import (
+    DatabaseConfigurationsRepository,
 )
 from maasservicelayer.db.repositories.consumers import ConsumersRepository
 from maasservicelayer.db.repositories.dhcpsnippets import (
@@ -72,7 +72,13 @@ from maasservicelayer.services.agents import AgentsService
 from maasservicelayer.services.auth import AuthService
 from maasservicelayer.services.base import ServiceCache
 from maasservicelayer.services.configurations import ConfigurationsService
+<<<<<<< src/maasservicelayer/services/__init__.py
 from maasservicelayer.services.consumers import ConsumersService
+=======
+from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationsService,
+)
+>>>>>>> src/maasservicelayer/services/__init__.py
 from maasservicelayer.services.dhcpsnippets import DhcpSnippetsService
 from maasservicelayer.services.discoveries import DiscoveriesService
 from maasservicelayer.services.dnsdata import DNSDataService
@@ -153,6 +159,7 @@ class ServiceCollectionV3:
     # Keep them in alphabetical order, please
     agents: AgentsService
     auth: AuthService
+    database_configurations: DatabaseConfigurationsService
     configurations: ConfigurationsService
     consumers: ConsumersService
     dhcpsnippets: DhcpSnippetsService
@@ -203,9 +210,16 @@ class ServiceCollectionV3:
         cache: CacheForServices,
     ) -> Self:
         services = cls()
-        services.configurations = ConfigurationsService(
+        services.events = EventsService(
             context=context,
-            configurations_repository=ConfigurationsRepository(context),
+            events_repository=EventsRepository(context),
+            eventtypes_repository=EventTypesRepository(context),
+        )
+        services.database_configurations = DatabaseConfigurationsService(
+            context=context,
+            database_configurations_repository=DatabaseConfigurationsRepository(
+                context
+            ),
         )
         services.service_status = ServiceStatusService(
             context=context,
@@ -213,21 +227,22 @@ class ServiceCollectionV3:
         )
         services.secrets = await SecretsServiceFactory.produce(
             context=context,
-            config_service=services.configurations,
+            database_configurations_service=services.database_configurations,
             cache=cache.get(
                 SecretsService.__name__, SecretsService.build_cache_object
             ),  # type: ignore
+        )
+        services.configurations = ConfigurationsService(
+            context=context,
+            database_configurations_service=services.database_configurations,
+            secrets_service=services.secrets,
+            events_service=services.events,
         )
         services.temporal = TemporalService(
             context=context,
             cache=cache.get(
                 TemporalService.__name__, TemporalService.build_cache_object
             ),
-        )
-        services.events = EventsService(
-            context=context,
-            events_repository=EventsRepository(context),
-            eventtypes_repository=EventTypesRepository(context),
         )
         services.scriptresults = ScriptResultsService(
             context=context,
@@ -272,7 +287,6 @@ class ServiceCollectionV3:
         services.staticipaddress = StaticIPAddressService(
             context=context,
             temporal_service=services.temporal,
-            configurations_service=services.configurations,
             staticipaddress_repository=StaticIPAddressRepository(context),
         )
         services.dhcpsnippets = DhcpSnippetsService(
