@@ -1,0 +1,57 @@
+# Copyright 2025 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
+from typing import Self
+
+from maasapiserver.v3.api.public.models.responses.base import (
+    BaseHal,
+    BaseHref,
+    HalResponse,
+    PaginatedResponse,
+)
+from maasservicelayer.models.fields import PackageRepoUrl
+from maasservicelayer.models.packagerepositories import PackageRepository
+
+
+class PackageRepositoryResponse(HalResponse[BaseHal]):
+    kind = "PackageRepository"
+    name: str
+    key: str
+    url: PackageRepoUrl
+    distributions: list[str]
+    components: list[str]
+    arches: list[str]
+    disabled_pockets: list[str]
+    disabled_components: list[str]
+    disable_sources: bool
+    default: bool
+    enabled: bool
+
+    @classmethod
+    def from_model(
+        cls, package_repository: PackageRepository, self_base_hyperlink: str
+    ) -> Self:
+        return cls(
+            name=package_repository.name,
+            key=package_repository.key,
+            url=package_repository.url,
+            distributions=package_repository.distributions,
+            components=package_repository.components,
+            arches=package_repository.arches,
+            disabled_pockets=package_repository.disabled_pockets,
+            disabled_components=package_repository.disabled_components,
+            disable_sources=package_repository.disable_sources,
+            default=package_repository.default,
+            enabled=package_repository.enabled,
+            hal_links=BaseHal(
+                self=BaseHref(
+                    href=f"{self_base_hyperlink.rstrip('/')}/{package_repository.id}"
+                )
+            ),
+        )
+
+
+class PackageRepositoryListResponse(
+    PaginatedResponse[PackageRepositoryResponse]
+):
+    kind = "PackageRepositoryList"

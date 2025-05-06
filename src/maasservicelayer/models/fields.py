@@ -5,6 +5,7 @@ from ipaddress import _BaseNetwork, IPv4Network, IPv6Network
 import re
 from typing import Any, Union
 
+from pydantic import AnyHttpUrl, ValidationError
 from pydantic.networks import NetworkType
 
 from maascommon.fields import MAC_FIELD_RE, normalise_macaddress
@@ -66,3 +67,29 @@ class MacAddress(str):
         if match is None:
             raise ValueError("Value is not a valid MAC address.")
         return normalise_macaddress(value)
+
+
+class PackageRepoUrl(str):
+    """
+    PPA urls are in the form of `ppa:<user>/<ppa_name>`
+    - user: between 3-32 chars, lowercase letters, numbers and hyphens
+    - repo: must start with a lowercase letter or number, then lowercase letters,
+          numbers, dots, hyphens and pluses.
+    OR, they are a classic URL.
+    """
+
+    PPA_RE = re.compile(r"^ppa:[a-z0-9\-]{3,32}/[a-z0-9]{1}[a-z0-9\.\-\+]+$")
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value: str, field, config) -> str:
+        match = re.fullmatch(cls.PPA_RE, value)
+        if match is None:
+            try:
+                value = str(AnyHttpUrl.validate(value, field, config))
+            except ValidationError as e:
+                raise ValueError("Value is not a valid PPA URL.") from e
+        return value

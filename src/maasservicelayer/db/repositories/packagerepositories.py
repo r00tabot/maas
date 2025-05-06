@@ -1,0 +1,45 @@
+# Copyright 2025 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
+from operator import eq
+
+from sqlalchemy import select, Table
+
+from maascommon.package_repository import PackageRepositoryConstants
+from maasservicelayer.db.repositories.base import BaseRepository
+from maasservicelayer.db.tables import PackageRepositoryTable
+from maasservicelayer.models.packagerepositories import PackageRepository
+
+
+class PackageRepositoryRepository(BaseRepository[PackageRepository]):
+    def get_repository_table(self) -> Table:
+        return PackageRepositoryTable
+
+    def get_model_factory(self) -> type[PackageRepository]:
+        return PackageRepository
+
+    async def get_main_archive(self) -> PackageRepository:
+        stmt = select(PackageRepositoryTable).where(
+            PackageRepositoryTable.c.arches.in_(
+                PackageRepositoryConstants.MAIN_ARCHES
+            ),
+            eq(PackageRepositoryTable.c.enabled, True),
+            eq(PackageRepositoryTable.c.default, True),
+        )
+        result = await self.execute_stmt(stmt)
+        # The main archive is always present
+        package_repo = result.one()
+        return PackageRepository(**package_repo._asdict())
+
+    async def get_ports_archive(self) -> PackageRepository:
+        stmt = select(PackageRepositoryTable).where(
+            PackageRepositoryTable.c.arches.in_(
+                PackageRepositoryConstants.PORTS_ARCHES
+            ),
+            eq(PackageRepositoryTable.c.enabled, True),
+            eq(PackageRepositoryTable.c.default, True),
+        )
+        result = await self.execute_stmt(stmt)
+        # The ports archive is always present
+        package_repo = result.one()
+        return PackageRepository(**package_repo._asdict())

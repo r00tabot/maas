@@ -13,6 +13,15 @@ from django.db.models import (
     TextField,
 )
 
+from maascommon.enums.package_repositories import (
+    ComponentsToDisableEnum,
+    KnownArchesEnum,
+    KnownComponentsEnum,
+    MainArchesEnum,
+    PocketsToDisableEnum,
+    PortsArchesEnum,
+)
+from maascommon.package_repository import PackageRepositoryConstants
 from maasserver.fields import URLOrPPAField
 from maasserver.models.cleansave import CleanSave
 from maasserver.models.timestampedmodel import TimestampedModel
@@ -90,12 +99,12 @@ class PackageRepositoryManager(Manager, PackageRepositoryQueriesMixin):
 class PackageRepository(CleanSave, TimestampedModel):
     """A `PackageRepository`."""
 
-    MAIN_ARCHES = ["amd64", "i386"]
-    PORTS_ARCHES = ["armhf", "arm64", "ppc64el", "s390x"]
-    KNOWN_ARCHES = MAIN_ARCHES + PORTS_ARCHES
-    POCKETS_TO_DISABLE = ["updates", "security", "backports"]
-    COMPONENTS_TO_DISABLE = ["restricted", "universe", "multiverse"]
-    KNOWN_COMPONENTS = ["main", "restricted", "universe", "multiverse"]
+    MAIN_ARCHES = list(MainArchesEnum.__members__)
+    PORTS_ARCHES = list(PortsArchesEnum.__members__)
+    KNOWN_ARCHES = list(KnownArchesEnum.__members__)
+    POCKETS_TO_DISABLE = list(PocketsToDisableEnum.__members__)
+    COMPONENTS_TO_DISABLE = list(ComponentsToDisableEnum.__members__)
+    KNOWN_COMPONENTS = list(KnownComponentsEnum.__members__)
 
     objects = PackageRepositoryManager()
 
