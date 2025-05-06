@@ -1,5 +1,5 @@
-#  Copyright 2025 Canonical Ltd.  This software is licensed under the
-#  GNU Affero General Public License version 3 (see the file LICENSE).
+# Copyright 2025 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 from contextlib import suppress
 from typing import Any, TypeVar
 
@@ -21,8 +21,24 @@ from maasservicelayer.services.secrets import SecretNotFound, SecretsService
 
 T = TypeVar("T", bound=Config)
 
+logger = structlog.getLogger()
+
 
 class ConfigurationsService(Service):
+    """
+    Service providing unified access to configuration values.
+
+    This service retrieves configuration values from either a database or a
+    secrets backend (such as Vault). It acts as a high-level abstraction layer
+    to access configurations, some of which may be defined in
+    `maasservicelayer.models.configurations`, while others may be dynamically
+    stored in the backend.
+
+    It is also designed to be used by the Django application, and may return
+    raw values (not strictly instances of `Config`), allowing flexible usage
+    even for configurations not explicitly modeled.
+    """
+
     def __init__(
         self,
         context: Context,
@@ -36,23 +52,29 @@ class ConfigurationsService(Service):
         self.events_service = events_service
 
     async def get(self, name: str, default=None) -> Any:
-        """Return the config value corresponding to the given config name.
-        Return None or the provided default if the config value does not
-        exist.
+        """
+        Retrieve a single configuration value.
 
-        :param name: The name of the config item.
-        :type name: unicode
-        :param default: The optional default value to return if no such config
-            item exists.
-        :type default: object
-        :return: A config value.
-        :raises: Config.MultipleObjectsReturned
+        Looks up the configuration by name. If the configuration is defined
+        and stored as a secret, it is retrieved from the secrets backend.
+        Otherwise, it is fetched from the database.
+
+        If the configuration is unknown or not found, the provided `default`
+        value is returned (or `None` if not specified).
+
+        Args:
+            name: The name of the configuration to retrieve.
+            default: The default value to return if the configuration is
+                missing or undefined.
+
+        Returns:
+            The configuration value, or `default` if not found.
         """
         config_model = None
         try:
             config_model = ConfigFactory.get_config_model(name)
         except ValueError:
-            structlog.warn(
+            logger.warn(
                 f"The configuration '{name}' is not known. Using the default {default} if the config does not exist in the DB."
             )
             default_value = default
@@ -69,9 +91,19 @@ class ConfigurationsService(Service):
             return default_value
 
     async def get_many(self, names: set[str]) -> dict[str, Any]:
-        """Return the config values corresponding to the given config names.
-        Return None or the provided default if the config value does not
-        exist.
+        """
+        Retrieve multiple configuration values at once.
+
+        Secret-stored configurations are fetched from the secrets
+        backend; the rest are fetched from the database.
+
+        If a configuration is unknown or not found, its default is returned.
+
+        Args:
+            names: A set of configuration names to retrieve.
+
+        Returns:
+            A dictionary mapping configuration names to their resolved values.
         """
 
         config_models = {

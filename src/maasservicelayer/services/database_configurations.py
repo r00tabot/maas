@@ -22,7 +22,8 @@ class DatabaseConfigurationNotFound(Exception):
 class DatabaseConfigurationsService(Service):
     """
     This service is used only to fetch configurations from the DB!
-    Most of the times you want to use the `maasservicelayer.services.entities.configurations service instead.
+    You might definitely want to use the `maasservicelayer.services.entities.configurations` service instead, unless you know
+    what you are doing.
     """
 
     def __init__(

@@ -12,6 +12,7 @@ from maasservicelayer.db.repositories.database_configurations import (
 )
 from maasservicelayer.models.configurations import DatabaseConfiguration
 from maasservicelayer.services.database_configurations import (
+    DatabaseConfigurationNotFound,
     DatabaseConfigurationsService,
 )
 
@@ -44,4 +45,5 @@ class TestDatabaseConfigurationsService:
             context=Context(),
             database_configurations_repository=database_configurations_repository_mock,
         )
-        assert await configurations_service.get("test") is None
+        with pytest.raises(DatabaseConfigurationNotFound):
+            await configurations_service.get("test")
