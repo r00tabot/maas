@@ -13,7 +13,7 @@ from maasapiserver.v3.api.public.handlers.machines import MachinesHandler
 from maasapiserver.v3.api.public.handlers.notifications import (
     NotificationsHandler,
 )
-from maasapiserver.v3.api.public.handlers.packagerepositories import (
+from maasapiserver.v3.api.public.handlers.package_repositories import (
     PackageRepositoriesHandler,
 )
 from maasapiserver.v3.api.public.handlers.reservedips import ReservedIPsHandler

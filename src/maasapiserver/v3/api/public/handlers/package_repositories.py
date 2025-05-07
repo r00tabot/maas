@@ -13,7 +13,7 @@ from maasapiserver.common.api.models.responses.errors import (
     NotFoundResponse,
 )
 from maasapiserver.v3.api import services
-from maasapiserver.v3.api.public.models.requests.packagerepositories import (
+from maasapiserver.v3.api.public.models.requests.package_repositories import (
     PackageRepositoryCreateRequest,
     PackageRepositoryUpdateRequest,
 )
@@ -21,7 +21,7 @@ from maasapiserver.v3.api.public.models.requests.query import PaginationParams
 from maasapiserver.v3.api.public.models.responses.base import (
     OPENAPI_ETAG_HEADER,
 )
-from maasapiserver.v3.api.public.models.responses.packagerepositories import (
+from maasapiserver.v3.api.public.models.responses.package_repositories import (
     PackageRepositoryListResponse,
     PackageRepositoryResponse,
 )

@@ -6,7 +6,7 @@ from maasapiserver.v3.api.public.handlers.package_repositories import (
     PackageRepositoryResponse,
 )
 from maasservicelayer.models.fields import PackageRepoUrl
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 from maasservicelayer.utils.date import utcnow
 
 

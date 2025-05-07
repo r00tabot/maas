@@ -11,7 +11,7 @@ from maascommon.enums.package_repositories import (
 )
 from maasservicelayer.db.repositories.base import BaseRepository
 from maasservicelayer.db.tables import PackageRepositoryTable
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 
 
 class PackageRepositoryRepository(BaseRepository[PackageRepository]):

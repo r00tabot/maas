@@ -14,12 +14,12 @@ from maasservicelayer.builders.packagerepositories import (
     PackageRepositoryBuilder,
 )
 from maasservicelayer.context import Context
-from maasservicelayer.db.repositories.packagerepositories import (
+from maasservicelayer.db.repositories.package_repositories import (
     PackageRepositoryRepository,
 )
 from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 from tests.fixtures.factories.package_repositories import (
     create_test_package_repository,
 )

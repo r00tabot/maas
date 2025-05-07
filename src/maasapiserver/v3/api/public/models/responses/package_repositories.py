@@ -10,7 +10,7 @@ from maasapiserver.v3.api.public.models.responses.base import (
     PaginatedResponse,
 )
 from maasservicelayer.models.fields import PackageRepoUrl
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 
 
 class PackageRepositoryResponse(HalResponse[BaseHal]):

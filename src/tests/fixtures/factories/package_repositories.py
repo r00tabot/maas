@@ -4,7 +4,7 @@
 from typing import Any
 
 from maasservicelayer.db.tables import PackageRepositoryTable
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 from maasservicelayer.utils.date import utcnow
 from tests.maasapiserver.fixtures.db import Fixture
 

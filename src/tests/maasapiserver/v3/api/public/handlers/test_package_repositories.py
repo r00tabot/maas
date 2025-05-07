@@ -8,7 +8,7 @@ from httpx import AsyncClient
 import pytest
 
 from maasapiserver.common.api.models.responses.errors import ErrorBodyResponse
-from maasapiserver.v3.api.public.models.responses.packagerepositories import (
+from maasapiserver.v3.api.public.models.responses.package_repositories import (
     PackageRepositoryListResponse,
     PackageRepositoryResponse,
 )
@@ -31,9 +31,9 @@ from maasservicelayer.exceptions.constants import (
 )
 from maasservicelayer.models.base import ListResult
 from maasservicelayer.models.fields import PackageRepoUrl
-from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.models.package_repositories import PackageRepository
 from maasservicelayer.services import ServiceCollectionV3
-from maasservicelayer.services.packagerepositories import (
+from maasservicelayer.services.package_repositories import (
     PackageRepositoryService,
 )
 from maasservicelayer.utils.date import utcnow

@@ -3,7 +3,7 @@
 
 import pytest
 
-from maasapiserver.v3.api.public.models.requests.packagerepositories import (
+from maasapiserver.v3.api.public.models.requests.package_repositories import (
     PackageRepositoryCreateRequest,
     PackageRepositoryUpdateRequest,
 )

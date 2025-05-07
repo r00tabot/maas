@@ -39,7 +39,7 @@ from maasservicelayer.db.repositories.nodes import NodesRepository
 from maasservicelayer.db.repositories.notifications import (
     NotificationsRepository,
 )
-from maasservicelayer.db.repositories.packagerepositories import (
+from maasservicelayer.db.repositories.package_repositories import (
     PackageRepositoryRepository,
 )
 from maasservicelayer.db.repositories.rdns import RDNSRepository
@@ -101,7 +101,7 @@ from maasservicelayer.services.nodegrouptorackcontrollers import (
 )
 from maasservicelayer.services.nodes import NodesService
 from maasservicelayer.services.notifications import NotificationsService
-from maasservicelayer.services.packagerepositories import (
+from maasservicelayer.services.package_repositories import (
     PackageRepositoryService,
 )
 from maasservicelayer.services.rdns import RDNSService
