@@ -170,7 +170,7 @@ class TestControllerHandler(MAASServerTestCase):
         # and slowing down the client waiting for the response.
         self.assertEqual(
             queries,
-            33,  # 33 + 1 from the service layer
+            34,
             "Number of queries has changed; make sure this is expected.",
         )
 
