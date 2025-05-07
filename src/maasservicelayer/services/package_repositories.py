@@ -4,7 +4,7 @@
 from typing import List
 
 from maascommon.enums.events import EventTypeEnum
-from maasservicelayer.builders.packagerepositories import (
+from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
 from maasservicelayer.context import Context

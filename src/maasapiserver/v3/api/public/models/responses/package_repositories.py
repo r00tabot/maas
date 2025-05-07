@@ -20,10 +20,10 @@ class PackageRepositoryResponse(HalResponse[BaseHal]):
     key: str
     url: PackageRepoUrl
     distributions: list[str]
-    components: list[str]
-    arches: list[str]
-    disabled_pockets: list[str]
-    disabled_components: list[str]
+    components: set[str]
+    arches: set[str]
+    disabled_pockets: set[str]
+    disabled_components: set[str]
     disable_sources: bool
     enabled: bool
     # the 'default' field is excluded from the response

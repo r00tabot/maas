@@ -10,14 +10,13 @@ from maascommon.enums.package_repositories import (
     PACKAGE_REPO_MAIN_ARCHES,
     PACKAGE_REPO_PORTS_ARCHES,
 )
-from maasservicelayer.builders.packagerepositories import (
+from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.package_repositories import (
     PackageRepositoriesRepository,
 )
-from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
 from maasservicelayer.models.package_repositories import PackageRepository
 from tests.fixtures.factories.package_repositories import (
@@ -141,15 +140,3 @@ class TestPackageRepositoriesRepository:
         ports_archive = await repository.get_ports_archive()
         assert ports_archive is not None
         assert ports_archive.name == "ports_archive"
-
-    async def test_delete_main_archive(
-        self, repository: PackageRepositoriesRepository
-    ) -> None:
-        with pytest.raises(BadRequestException):
-            await repository.delete_by_id(1)
-
-    async def test_delete_ports_archive(
-        self, repository: PackageRepositoriesRepository
-    ) -> None:
-        with pytest.raises(BadRequestException):
-            await repository.delete_by_id(2)

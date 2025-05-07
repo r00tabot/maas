@@ -17,8 +17,6 @@ from maascommon.enums.package_repositories import (
     ComponentsToDisableEnum,
     KnownArchesEnum,
     KnownComponentsEnum,
-    PACKAGE_REPO_MAIN_ARCHES,
-    PACKAGE_REPO_PORTS_ARCHES,
     PocketsToDisableEnum,
 )
 from maasserver.fields import URLOrPPAField
@@ -98,12 +96,30 @@ class PackageRepositoryManager(Manager, PackageRepositoryQueriesMixin):
 class PackageRepository(CleanSave, TimestampedModel):
     """A `PackageRepository`."""
 
-    MAIN_ARCHES = list(PACKAGE_REPO_MAIN_ARCHES)
-    PORTS_ARCHES = list(PACKAGE_REPO_PORTS_ARCHES)
-    KNOWN_ARCHES = list(KnownArchesEnum.__members__)
-    POCKETS_TO_DISABLE = list(PocketsToDisableEnum.__members__)
-    COMPONENTS_TO_DISABLE = list(ComponentsToDisableEnum.__members__)
-    KNOWN_COMPONENTS = list(KnownComponentsEnum.__members__)
+    MAIN_ARCHES = [KnownArchesEnum.AMD64.value, KnownArchesEnum.I386.value]
+    PORTS_ARCHES = [
+        KnownArchesEnum.ARMHF.value,
+        KnownArchesEnum.ARM64.value,
+        KnownArchesEnum.PPC64EL.value,
+        KnownArchesEnum.S390X.value,
+    ]
+    KNOWN_ARCHES = MAIN_ARCHES + PORTS_ARCHES
+    POCKETS_TO_DISABLE = [
+        PocketsToDisableEnum.UPDATES.value,
+        PocketsToDisableEnum.SECURITY.value,
+        PocketsToDisableEnum.BACKPORTS.value,
+    ]
+    COMPONENTS_TO_DISABLE = [
+        ComponentsToDisableEnum.RESTRICTED.value,
+        ComponentsToDisableEnum.UNIVERSE.value,
+        ComponentsToDisableEnum.MULTIVERSE.value,
+    ]
+    KNOWN_COMPONENTS = [
+        KnownComponentsEnum.MAIN.value,
+        KnownComponentsEnum.RESTRICTED.value,
+        KnownComponentsEnum.UNIVERSE.value,
+        KnownComponentsEnum.MULTIVERSE.value,
+    ]
 
     objects = PackageRepositoryManager()
 

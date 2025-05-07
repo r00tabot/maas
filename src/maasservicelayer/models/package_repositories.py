@@ -20,7 +20,6 @@ class PackageRepository(MaasTimestampedBaseModel):
     key: str
     url: PackageRepoUrl
     distributions: list[str]
-    # TODO: check if arbitrary components are allowed
     components: set[KnownComponentsEnum]
     arches: set[KnownArchesEnum]
     disabled_pockets: set[PocketsToDisableEnum]

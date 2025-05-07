@@ -10,7 +10,7 @@ from maascommon.enums.package_repositories import (
     PACKAGE_REPO_MAIN_ARCHES,
     PACKAGE_REPO_PORTS_ARCHES,
 )
-from maasservicelayer.builders.packagerepositories import (
+from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
 from maasservicelayer.context import Context
