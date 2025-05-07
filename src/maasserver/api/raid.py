@@ -50,7 +50,7 @@ class RaidsHandler(OperationsHandler):
 
         @param (string) "uuid" [required=false] UUID of the RAID.
 
-        @param (int) "level" [required=true] RAID level.
+        @param (string) "level" [required=true] RAID level (ie: "raid-0").
 
         @param (string) "block_devices" [required=false] Block devices to add
         to the RAID.

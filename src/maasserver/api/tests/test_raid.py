@@ -225,6 +225,7 @@ class TestRaidsAPI(APITestCase.ForUser):
         ) = get_devices_from_raid(parsed_device)
         raid = RAID.objects.get(id=parsed_device["id"])
         self.assertEqual(parsed_device["size"], raid.get_size())
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertEqual(uuid4, parsed_device["uuid"])
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
@@ -317,6 +318,7 @@ class TestRaidsAPI(APITestCase.ForUser):
         self.assertEqual(
             PART_SIZE - RAID_SUPERBLOCK_OVERHEAD, parsed_device["size"]
         )
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertEqual(uuid4, parsed_device["uuid"])
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
@@ -373,6 +375,7 @@ class TestRaidsAPI(APITestCase.ForUser):
         self.assertEqual(
             PART_SIZE - RAID_SUPERBLOCK_OVERHEAD, parsed_device["size"]
         )
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertEqual(uuid4, parsed_device["uuid"])
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
@@ -433,6 +436,7 @@ class TestRaidsAPI(APITestCase.ForUser):
             (7 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
             parsed_device["size"],
         )
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
         self.assertEqual(spare_devices, parsed_block_device_spares)
@@ -493,6 +497,7 @@ class TestRaidsAPI(APITestCase.ForUser):
             (6 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
             parsed_device["size"],
         )
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
         self.assertEqual(spare_devices, parsed_block_device_spares)
@@ -553,6 +558,7 @@ class TestRaidsAPI(APITestCase.ForUser):
             (4 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
             parsed_device["size"],
         )
+        self.assertIsInstance(parsed_device["size"], int)
         self.assertCountEqual(block_devices, parsed_block_devices)
         self.assertCountEqual(partitions, parsed_partitions)
         self.assertEqual(spare_devices, parsed_block_device_spares)
@@ -900,6 +906,7 @@ class TestRaidAPI(APITestCase.ForUser):
         self.assertEqual(parsed_raid.get("name"), raid.name)
         self.assertEqual(parsed_raid.get("level"), raid.group_type)
         self.assertEqual(parsed_raid.get("size"), raid.get_size())
+        self.assertIsInstance(parsed_raid.get("size"), int)
         self.assertEqual(
             parsed_raid.get("human_size"),
             human_readable_bytes(raid.get_size()),

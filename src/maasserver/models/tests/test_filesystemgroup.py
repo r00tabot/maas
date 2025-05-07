@@ -807,6 +807,7 @@ class TestFilesystemGroup(MAASServerTestCase):
             fsgroup.get_size(),
             (small_size + large_size) - RAID_SUPERBLOCK_OVERHEAD * 2,
         )
+        self.assertIsInstance(fsgroup.get_size(), int)
 
     def test_get_size_returns_smallest_disk_size_for_raid_1(self):
         node = factory.make_Node()
@@ -834,6 +835,7 @@ class TestFilesystemGroup(MAASServerTestCase):
         self.assertEqual(
             small_size - RAID_SUPERBLOCK_OVERHEAD, fsgroup.get_size()
         )
+        self.assertIsInstance(fsgroup.get_size(), int)
 
     def test_get_size_returns_correct_disk_size_for_raid_5(self):
         node = factory.make_Node()
@@ -876,6 +878,7 @@ class TestFilesystemGroup(MAASServerTestCase):
             (small_size * number_of_raid_devices) - RAID_SUPERBLOCK_OVERHEAD,
             fsgroup.get_size(),
         )
+        self.assertIsInstance(fsgroup.get_size(), int)
 
     def test_get_size_returns_correct_disk_size_for_raid_6(self):
         node = factory.make_Node()
@@ -919,6 +922,7 @@ class TestFilesystemGroup(MAASServerTestCase):
             - RAID_SUPERBLOCK_OVERHEAD,
             fsgroup.get_size(),
         )
+        self.assertIsInstance(fsgroup.get_size(), int)
 
     @skip("XXX: GavinPanella 2015-12-04 bug=1522965: Fails spuriously.")
     def test_get_size_returns_correct_disk_size_for_raid_10(self):
@@ -963,6 +967,7 @@ class TestFilesystemGroup(MAASServerTestCase):
             - RAID_SUPERBLOCK_OVERHEAD,
             fsgroup.get_size(),
         )
+        self.assertIsInstance(fsgroup.get_size(), int)
 
     def test_get_size_returns_0_if_bcache_without_backing(self):
         fsgroup = FilesystemGroup(group_type=FILESYSTEM_GROUP_TYPE.BCACHE)
