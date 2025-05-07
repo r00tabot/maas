@@ -47,6 +47,7 @@ HEARTBEAT_TIMEOUT = timedelta(seconds=10)
 MSM_TIMEOUT = timedelta(minutes=15)
 MSM_REFRESH_RETRY_INTERVAL = timedelta(minutes=1)
 MSM_POLL_INTERVAL = timedelta(minutes=1)
+MSM_SECRET = "msm-connector"
 
 MSM_ENROL_EP = "/site/v1/enroll"
 MSM_DETAIL_EP = "/site/v1/details"
