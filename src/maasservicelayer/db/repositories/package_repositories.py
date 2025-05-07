@@ -14,7 +14,7 @@ from maasservicelayer.db.tables import PackageRepositoryTable
 from maasservicelayer.models.package_repositories import PackageRepository
 
 
-class PackageRepositoryRepository(BaseRepository[PackageRepository]):
+class PackageRepositoriesRepository(BaseRepository[PackageRepository]):
     def get_repository_table(self) -> Table:
         return PackageRepositoryTable
 

@@ -15,7 +15,7 @@ from maasservicelayer.builders.packagerepositories import (
 )
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.package_repositories import (
-    PackageRepositoryRepository,
+    PackageRepositoriesRepository,
 )
 from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
@@ -27,14 +27,14 @@ from tests.maasapiserver.fixtures.db import Fixture
 from tests.maasservicelayer.db.repositories.base import RepositoryCommonTests
 
 
-class TestCommonPackageRepositoryRepository(
+class TestCommonPackageRepositoriesRepository(
     RepositoryCommonTests[PackageRepository]
 ):
     @pytest.fixture
     def repository_instance(
         self, db_connection: AsyncConnection
-    ) -> PackageRepositoryRepository:
-        return PackageRepositoryRepository(
+    ) -> PackageRepositoriesRepository:
+        return PackageRepositoriesRepository(
             context=Context(connection=db_connection)
         )
 
@@ -119,37 +119,37 @@ class TestCommonPackageRepositoryRepository(
 
 @pytest.mark.usefixtures("ensuremaasdb")
 @pytest.mark.asyncio
-class TestPackageRepositoryRepository:
+class TestPackageRepositoriesRepository:
     @pytest.fixture
     def repository(
         self, db_connection: AsyncConnection
-    ) -> PackageRepositoryRepository:
-        return PackageRepositoryRepository(
+    ) -> PackageRepositoriesRepository:
+        return PackageRepositoriesRepository(
             context=Context(connection=db_connection)
         )
 
     async def test_get_main_archive(
-        self, repository: PackageRepositoryRepository
+        self, repository: PackageRepositoriesRepository
     ) -> None:
         main_archive = await repository.get_main_archive()
         assert main_archive is not None
         assert main_archive.name == "main_archive"
 
     async def test_get_ports_archive(
-        self, repository: PackageRepositoryRepository
+        self, repository: PackageRepositoriesRepository
     ) -> None:
         ports_archive = await repository.get_ports_archive()
         assert ports_archive is not None
         assert ports_archive.name == "ports_archive"
 
     async def test_delete_main_archive(
-        self, repository: PackageRepositoryRepository
+        self, repository: PackageRepositoriesRepository
     ) -> None:
         with pytest.raises(BadRequestException):
             await repository.delete_by_id(1)
 
     async def test_delete_ports_archive(
-        self, repository: PackageRepositoryRepository
+        self, repository: PackageRepositoriesRepository
     ) -> None:
         with pytest.raises(BadRequestException):
             await repository.delete_by_id(2)

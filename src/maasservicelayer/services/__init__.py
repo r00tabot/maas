@@ -40,7 +40,7 @@ from maasservicelayer.db.repositories.notifications import (
     NotificationsRepository,
 )
 from maasservicelayer.db.repositories.package_repositories import (
-    PackageRepositoryRepository,
+    PackageRepositoriesRepository,
 )
 from maasservicelayer.db.repositories.rdns import RDNSRepository
 from maasservicelayer.db.repositories.reservedips import ReservedIPsRepository
@@ -102,7 +102,7 @@ from maasservicelayer.services.nodegrouptorackcontrollers import (
 from maasservicelayer.services.nodes import NodesService
 from maasservicelayer.services.notifications import NotificationsService
 from maasservicelayer.services.package_repositories import (
-    PackageRepositoryService,
+    PackageRepositoriesService,
 )
 from maasservicelayer.services.rdns import RDNSService
 from maasservicelayer.services.reservedips import ReservedIPsService
@@ -181,7 +181,7 @@ class ServiceCollectionV3:
     nodegrouptorackcontrollers: NodeGroupToRackControllersService
     nodes: NodesService
     notifications: NotificationsService
-    package_repositories: PackageRepositoryService
+    package_repositories: PackageRepositoriesService
     rdns: RDNSService
     reservedips: ReservedIPsService
     resource_pools: ResourcePoolsService
@@ -474,9 +474,9 @@ class ServiceCollectionV3:
             rdns_service=services.rdns,
             neighbours_service=services.neighbours,
         )
-        services.package_repositories = PackageRepositoryService(
+        services.package_repositories = PackageRepositoriesService(
             context=context,
-            repository=PackageRepositoryRepository(context),
+            repository=PackageRepositoriesRepository(context),
             events_service=services.events,
         )
         return services

@@ -9,7 +9,7 @@ from maasservicelayer.builders.packagerepositories import (
 )
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.package_repositories import (
-    PackageRepositoryRepository,
+    PackageRepositoriesRepository,
 )
 from maasservicelayer.exceptions.catalog import (
     BadRequestException,
@@ -24,17 +24,17 @@ from maasservicelayer.services.base import BaseService, ServiceCache
 from maasservicelayer.services.events import EventsService
 
 
-class PackageRepositoryService(
+class PackageRepositoriesService(
     BaseService[
         PackageRepository,
-        PackageRepositoryRepository,
+        PackageRepositoriesRepository,
         PackageRepositoryBuilder,
     ]
 ):
     def __init__(
         self,
         context: Context,
-        repository: PackageRepositoryRepository,
+        repository: PackageRepositoriesRepository,
         events_service: EventsService,
         cache: ServiceCache | None = None,
     ):

@@ -15,14 +15,14 @@ from maasservicelayer.builders.packagerepositories import (
 )
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.package_repositories import (
-    PackageRepositoryRepository,
+    PackageRepositoriesRepository,
 )
 from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
 from maasservicelayer.models.package_repositories import PackageRepository
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.package_repositories import (
-    PackageRepositoryService,
+    PackageRepositoriesService,
 )
 from maasservicelayer.utils.date import utcnow
 from tests.maasservicelayer.services.base import ServiceCommonTests
@@ -82,10 +82,10 @@ TEST_PACKAGE_REPO = PackageRepository(
 @pytest.mark.asyncio
 class TestCommonPackageRepositoriesService(ServiceCommonTests):
     @pytest.fixture
-    def service_instance(self) -> PackageRepositoryService:
-        return PackageRepositoryService(
+    def service_instance(self) -> PackageRepositoriesService:
+        return PackageRepositoriesService(
             context=Context(),
-            repository=Mock(PackageRepositoryRepository),
+            repository=Mock(PackageRepositoriesRepository),
             events_service=Mock(EventsService),
         )
 
@@ -105,7 +105,7 @@ class TestCommonPackageRepositoriesService(ServiceCommonTests):
 class TestPackageRepositoriesService:
     @pytest.fixture
     def repository_mock(self):
-        return Mock(PackageRepositoryRepository)
+        return Mock(PackageRepositoriesRepository)
 
     @pytest.fixture
     def events_service_mock(self):
@@ -114,29 +114,29 @@ class TestPackageRepositoriesService:
     @pytest.fixture
     def service(
         self, repository_mock, events_service_mock
-    ) -> PackageRepositoryService:
-        return PackageRepositoryService(
+    ) -> PackageRepositoriesService:
+        return PackageRepositoriesService(
             context=Context(),
             repository=repository_mock,
             events_service=events_service_mock,
         )
 
     async def test_get_main_archive(
-        self, repository_mock: Mock, service: PackageRepositoryService
+        self, repository_mock: Mock, service: PackageRepositoriesService
     ) -> None:
         repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
         await service.get_main_archive()
         repository_mock.get_main_archive.assert_called_once()
 
     async def test_get_ports_archive(
-        self, repository_mock: Mock, service: PackageRepositoryService
+        self, repository_mock: Mock, service: PackageRepositoriesService
     ) -> None:
         repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
         await service.get_ports_archive()
         repository_mock.get_ports_archive.assert_called_once()
 
     async def test_delete_default_archive(
-        self, repository_mock: Mock, service: PackageRepositoryService
+        self, repository_mock: Mock, service: PackageRepositoriesService
     ) -> None:
         repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
         repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
@@ -161,7 +161,7 @@ class TestPackageRepositoriesService:
         )
 
     async def test_update_arches_default_archive(
-        self, repository_mock: Mock, service: PackageRepositoryService
+        self, repository_mock: Mock, service: PackageRepositoriesService
     ) -> None:
         repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
         repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
@@ -187,7 +187,7 @@ class TestPackageRepositoriesService:
         self,
         repository_mock: Mock,
         events_service_mock: Mock,
-        service: PackageRepositoryService,
+        service: PackageRepositoriesService,
     ) -> None:
         repository_mock.create.return_value = TEST_PACKAGE_REPO
         events_service_mock.record_event.return_value = None
@@ -201,7 +201,7 @@ class TestPackageRepositoriesService:
         self,
         repository_mock: Mock,
         events_service_mock: Mock,
-        service: PackageRepositoryService,
+        service: PackageRepositoriesService,
     ) -> None:
         repository_mock.get_by_id.return_value = TEST_PACKAGE_REPO
         repository_mock.update_by_id.return_value = TEST_PACKAGE_REPO
@@ -217,7 +217,7 @@ class TestPackageRepositoriesService:
         self,
         repository_mock: Mock,
         events_service_mock: Mock,
-        service: PackageRepositoryService,
+        service: PackageRepositoriesService,
     ) -> None:
         repository_mock.delete_by_id.return_value = TEST_PACKAGE_REPO
         events_service_mock.record_event.return_value = None
