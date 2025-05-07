@@ -1,5 +1,6 @@
 # Copyright 2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
+from unittest.mock import Mock
 
 from httpx import AsyncClient
 import pytest
@@ -9,7 +10,10 @@ from maasapiserver.v3.api.public.models.responses.configurations import (
     ConfigurationResponse,
 )
 from maasapiserver.v3.constants import V3_API_PREFIX
-from maasservicelayer.services import ServiceCollectionV3
+from maasservicelayer.services import (
+    ConfigurationsService,
+    ServiceCollectionV3,
+)
 
 
 @pytest.mark.asyncio
@@ -21,6 +25,7 @@ class TestConfigurationsApi:
         services_mock: ServiceCollectionV3,
         mocked_api_client_user: AsyncClient,
     ):
+        services_mock.configurations = Mock(ConfigurationsService)
         services_mock.configurations.get.return_value = "test"
         response = await mocked_api_client_user.get(f"{self.BASE_PATH}/theme")
         assert response.status_code == 200
@@ -34,6 +39,7 @@ class TestConfigurationsApi:
         services_mock: ServiceCollectionV3,
         mocked_api_client_user: AsyncClient,
     ):
+        services_mock.configurations = Mock(ConfigurationsService)
         services_mock.configurations.get.return_value = None
         response = await mocked_api_client_user.get(
             f"{self.BASE_PATH}/unexisting"
@@ -48,6 +54,7 @@ class TestConfigurationsApi:
         services_mock: ServiceCollectionV3,
         mocked_api_client_user: AsyncClient,
     ):
+        services_mock.configurations = Mock(ConfigurationsService)
         services_mock.configurations.get.return_value = None
         response = await mocked_api_client_user.get(
             f"{self.BASE_PATH}/active_discovery_last_scan"

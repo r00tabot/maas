@@ -17,6 +17,7 @@ from maasservicelayer.models.configurations import (
     ThemeConfig,
     VCenterPasswordConfig,
 )
+from maasservicelayer.models.secrets import VCenterPasswordSecret
 from maasservicelayer.services import (
     ConfigurationsService,
     EventsService,
@@ -77,7 +78,7 @@ class TestIntegrationConfigurationsService:
         self, services: ServiceCollectionV3
     ):
         await services.secrets.set_simple_secret(
-            "vcenter-password", "mypassword"
+            VCenterPasswordSecret(), "mypassword"
         )
         assert (
             await services.configurations.get("vcenter_password")
@@ -122,7 +123,7 @@ class TestIntegrationConfigurationsService:
             "rpc_shared_secret": None,
         }
         await services.secrets.set_simple_secret(
-            "vcenter-password", "mypassword"
+            VCenterPasswordSecret(), "mypassword"
         )
         assert (
             await services.configurations.get_many(
@@ -177,7 +178,7 @@ class TestConfigurationsService:
         service.secrets_service.get_simple_secret.return_value = "mypassword"
         assert (await service.get(VCenterPasswordConfig.name)) == "mypassword"
         service.secrets_service.get_simple_secret.assert_called_once_with(
-            VCenterPasswordConfig.secret_name
+            VCenterPasswordConfig.secret_model
         )
         service.database_configurations_service.get.assert_not_called()
 
@@ -191,11 +192,11 @@ class TestConfigurationsService:
             events_service=Mock(EventsService),
         )
         service.secrets_service.get_simple_secret.side_effect = SecretNotFound(
-            VCenterPasswordConfig.secret_name
+            VCenterPasswordConfig.secret_model.secret_name
         )
         assert (await service.get(VCenterPasswordConfig.name)) == ""
         service.secrets_service.get_simple_secret.assert_called_once_with(
-            VCenterPasswordConfig.secret_name
+            VCenterPasswordConfig.secret_model
         )
         service.database_configurations_service.get.assert_not_called()
 
@@ -236,12 +237,10 @@ class TestConfigurationsService:
             VCenterPasswordConfig.name: "mypassword",
             RPCSharedSecretConfig.name: "secret",
         }
-        secrets = {
-            VCenterPasswordConfig.secret_name: "mypassword",
-            RPCSharedSecretConfig.secret_name: "secret",
-        }
         service.secrets_service.get_simple_secret.side_effect = (
-            lambda key: secrets[key]
+            lambda key: "mypassword"
+            if isinstance(key, VCenterPasswordSecret)
+            else "secret"
         )
         service.database_configurations_service.get_many.return_value = {}
         assert (
@@ -274,7 +273,7 @@ class TestConfigurationsService:
         }
 
         service.secrets_service.get_simple_secret.assert_called_once_with(
-            VCenterPasswordConfig.secret_name
+            VCenterPasswordConfig.secret_model
         )
         service.database_configurations_service.get_many.assert_called_once_with(
             query=QuerySpec(

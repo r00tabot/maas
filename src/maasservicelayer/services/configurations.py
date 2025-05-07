@@ -83,9 +83,9 @@ class ConfigurationsService(Service):
             default_value = config_model.default
         try:
             if config_model and config_model.stored_as_secret:
-                assert config_model.secret_name is not None
+                assert config_model.secret_model is not None
                 return await self.secrets_service.get_simple_secret(
-                    config_model.secret_name
+                    config_model.secret_model
                 )
             return await self.database_configurations_service.get(name=name)
         except (DatabaseConfigurationNotFound, SecretNotFound):
@@ -126,11 +126,11 @@ class ConfigurationsService(Service):
         for name, model in config_models.items():
             if model.stored_as_secret:
                 with suppress(SecretNotFound):
-                    assert model.secret_name is not None
+                    assert model.secret_model is not None
                     configs[
                         name
                     ] = await self.secrets_service.get_simple_secret(
-                        model.secret_name
+                        model.secret_model
                     )
                     # The config was found and added to the result: remove it from the regular config.
                     regular_configs.remove(name)

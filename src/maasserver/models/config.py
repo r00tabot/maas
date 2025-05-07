@@ -101,7 +101,9 @@ class ConfigManager(Manager):
                 f"The configuration '{name}' is not known. Anyways, it's going to be stored in the DB."
             )
         if config_model and config_model.stored_as_secret:
-            SecretManager().set_simple_secret(config_model.secret_name, value)
+            SecretManager().set_simple_secret(
+                config_model.secret_model.secret_name, value
+            )
         else:
             self.update_or_create(name=name, defaults={"value": value})
         self._handle_config_value_changed(name, value)
