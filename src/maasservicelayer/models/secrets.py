@@ -1,5 +1,6 @@
-# Copyright 2024 Canonical Ltd.  This software is licensed under the
+# Copyright 2024-2205 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, ClassVar

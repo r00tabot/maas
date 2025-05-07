@@ -1,3 +1,6 @@
+# Copyright 2022-2025 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
 from typing import Any, Literal, NamedTuple, Optional
 
 from django.db.models import Model
