@@ -5,13 +5,17 @@ from typing import Any
 
 from maasservicelayer.db.tables import PackageRepositoryTable
 from maasservicelayer.models.packagerepositories import PackageRepository
+from maasservicelayer.utils.date import utcnow
 from tests.maasapiserver.fixtures.db import Fixture
 
 
 async def create_test_package_repository(
-    fixture: Fixture, extra_details: dict[str, Any]
+    fixture: Fixture, **extra_details: Any
 ) -> PackageRepository:
+    now = utcnow()
     package_repo = {
+        "created": now,
+        "updated": now,
         "name": "test-main",
         "key": "test-key",
         "url": "http://archive.ubuntu.com/ubuntu",
@@ -21,10 +25,12 @@ async def create_test_package_repository(
         "disabled_pockets": set(),
         "disabled_components": set(),
         "disable_sources": False,
-        "default": True,
-        "enabled": False,
+        "default": False,
+        "enabled": True,
     }
     package_repo.update(extra_details)
 
-    [package_repo] = await fixture.create(PackageRepositoryTable, package_repo)
+    [package_repo] = await fixture.create(
+        PackageRepositoryTable.name, package_repo
+    )
     return PackageRepository(**package_repo)

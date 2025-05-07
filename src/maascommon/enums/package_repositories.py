@@ -4,18 +4,6 @@
 from enum import StrEnum
 
 
-class MainArchesEnum(StrEnum):
-    AMD64 = "amd64"
-    I386 = "i386"
-
-
-class PortsArchesEnum(StrEnum):
-    ARMHF = "armhf"
-    ARM64 = "arm64"
-    PPC64EL = "ppc64el"
-    S390X = "s390x"
-
-
 class KnownArchesEnum(StrEnum):
     AMD64 = "amd64"
     I386 = "i386"
@@ -42,3 +30,12 @@ class PocketsToDisableEnum(StrEnum):
     UPDATES = "updates"
     SECURITY = "security"
     BACKPORTS = "backports"
+
+
+PACKAGE_REPO_MAIN_ARCHES = {KnownArchesEnum.AMD64, KnownArchesEnum.I386}
+PACKAGE_REPO_PORTS_ARCHES = {
+    KnownArchesEnum.ARMHF,
+    KnownArchesEnum.ARM64,
+    KnownArchesEnum.PPC64EL,
+    KnownArchesEnum.S390X,
+}

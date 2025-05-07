@@ -17,11 +17,10 @@ from maascommon.enums.package_repositories import (
     ComponentsToDisableEnum,
     KnownArchesEnum,
     KnownComponentsEnum,
-    MainArchesEnum,
+    PACKAGE_REPO_MAIN_ARCHES,
+    PACKAGE_REPO_PORTS_ARCHES,
     PocketsToDisableEnum,
-    PortsArchesEnum,
 )
-from maascommon.package_repository import PackageRepositoryConstants
 from maasserver.fields import URLOrPPAField
 from maasserver.models.cleansave import CleanSave
 from maasserver.models.timestampedmodel import TimestampedModel
@@ -99,8 +98,8 @@ class PackageRepositoryManager(Manager, PackageRepositoryQueriesMixin):
 class PackageRepository(CleanSave, TimestampedModel):
     """A `PackageRepository`."""
 
-    MAIN_ARCHES = list(MainArchesEnum.__members__)
-    PORTS_ARCHES = list(PortsArchesEnum.__members__)
+    MAIN_ARCHES = list(PACKAGE_REPO_MAIN_ARCHES)
+    PORTS_ARCHES = list(PACKAGE_REPO_PORTS_ARCHES)
     KNOWN_ARCHES = list(KnownArchesEnum.__members__)
     POCKETS_TO_DISABLE = list(PocketsToDisableEnum.__members__)
     COMPONENTS_TO_DISABLE = list(ComponentsToDisableEnum.__members__)

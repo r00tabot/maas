@@ -5,10 +5,19 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.enums.events import EventTypeEnum
+from maascommon.enums.package_repositories import (
+    PACKAGE_REPO_MAIN_ARCHES,
+    PACKAGE_REPO_PORTS_ARCHES,
+)
+from maasservicelayer.builders.packagerepositories import (
+    PackageRepositoryBuilder,
+)
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.packagerepositories import (
     PackageRepositoryRepository,
 )
+from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
 from maasservicelayer.models.packagerepositories import PackageRepository
 from maasservicelayer.services.events import EventsService
@@ -18,8 +27,42 @@ from maasservicelayer.services.packagerepositories import (
 from maasservicelayer.utils.date import utcnow
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
-TEST_PACKAGE_REPO = PackageRepository(
+MAIN_PACKAGE_REPO = PackageRepository(
     id=1,
+    created=utcnow(),
+    updated=utcnow(),
+    name="main_archive",
+    url=PackageRepoUrl("http://archive.ubuntu.com/ubuntu"),
+    components=set(),
+    arches=PACKAGE_REPO_MAIN_ARCHES,
+    key="",
+    default=True,
+    enabled=True,
+    disabled_pockets=set(),
+    distributions=[],
+    disabled_components=set(),
+    disable_sources=True,
+)
+
+PORTS_PACKAGE_REPO = PackageRepository(
+    id=2,
+    created=utcnow(),
+    updated=utcnow(),
+    name="ports_archive",
+    url=PackageRepoUrl("http://ports.ubuntu.com/ubuntu-ports"),
+    components=set(),
+    arches=PACKAGE_REPO_PORTS_ARCHES,
+    key="",
+    default=True,
+    enabled=True,
+    disabled_pockets=set(),
+    distributions=[],
+    disabled_components=set(),
+    disable_sources=True,
+)
+
+TEST_PACKAGE_REPO = PackageRepository(
+    id=3,
     created=utcnow(),
     updated=utcnow(),
     name="test-main",
@@ -31,8 +74,8 @@ TEST_PACKAGE_REPO = PackageRepository(
     disabled_pockets=set(),
     disabled_components=set(),
     disable_sources=False,
-    default=True,
-    enabled=False,
+    default=False,
+    enabled=True,
 )
 
 
@@ -57,3 +100,129 @@ class TestCommonPackageRepositoriesService(ServiceCommonTests):
     async def test_update_many(self, service_instance, test_instance):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+
+class TestPackageRepositoriesService:
+    @pytest.fixture
+    def repository_mock(self):
+        return Mock(PackageRepositoryRepository)
+
+    @pytest.fixture
+    def events_service_mock(self):
+        return Mock(EventsService)
+
+    @pytest.fixture
+    def service(
+        self, repository_mock, events_service_mock
+    ) -> PackageRepositoryService:
+        return PackageRepositoryService(
+            context=Context(),
+            repository=repository_mock,
+            events_service=events_service_mock,
+        )
+
+    async def test_get_main_archive(
+        self, repository_mock: Mock, service: PackageRepositoryService
+    ) -> None:
+        repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
+        await service.get_main_archive()
+        repository_mock.get_main_archive.assert_called_once()
+
+    async def test_get_ports_archive(
+        self, repository_mock: Mock, service: PackageRepositoryService
+    ) -> None:
+        repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
+        await service.get_ports_archive()
+        repository_mock.get_ports_archive.assert_called_once()
+
+    async def test_delete_default_archive(
+        self, repository_mock: Mock, service: PackageRepositoryService
+    ) -> None:
+        repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
+        repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
+        repository_mock.get_by_id.side_effect = [
+            MAIN_PACKAGE_REPO,
+            PORTS_PACKAGE_REPO,
+        ]
+        with pytest.raises(BadRequestException) as e:
+            await service.delete_by_id(MAIN_PACKAGE_REPO.id)
+        assert e.value.details is not None
+        assert (
+            e.value.details[0].message
+            == "Default package repositories cannot be deleted."
+        )
+
+        with pytest.raises(BadRequestException) as e:
+            await service.delete_by_id(PORTS_PACKAGE_REPO.id)
+        assert e.value.details is not None
+        assert (
+            e.value.details[0].message
+            == "Default package repositories cannot be deleted."
+        )
+
+    async def test_update_arches_default_archive(
+        self, repository_mock: Mock, service: PackageRepositoryService
+    ) -> None:
+        repository_mock.get_main_archive.return_value = MAIN_PACKAGE_REPO
+        repository_mock.get_ports_archive.return_value = PORTS_PACKAGE_REPO
+        builder = PackageRepositoryBuilder(arches=set())
+        with pytest.raises(BadRequestException) as e:
+            await service.update_by_id(MAIN_PACKAGE_REPO.id, builder)
+        assert e.value.details is not None
+        assert (
+            e.value.details[0].message
+            == "Architectures for default package repositories cannot be updated."
+        )
+
+        with pytest.raises(BadRequestException) as e:
+            await service.update_by_id(PORTS_PACKAGE_REPO.id, builder)
+
+        assert e.value.details is not None
+        assert (
+            e.value.details[0].message
+            == "Architectures for default package repositories cannot be updated."
+        )
+
+    async def test_create_creates_event(
+        self,
+        repository_mock: Mock,
+        events_service_mock: Mock,
+        service: PackageRepositoryService,
+    ) -> None:
+        repository_mock.create.return_value = TEST_PACKAGE_REPO
+        events_service_mock.record_event.return_value = None
+        await service.create(builder=Mock(PackageRepository))
+        events_service_mock.record_event.assert_called_once_with(
+            event_type=EventTypeEnum.SETTINGS,
+            event_description=f"Created package repository {TEST_PACKAGE_REPO.name}",
+        )
+
+    async def test_update_creates_event(
+        self,
+        repository_mock: Mock,
+        events_service_mock: Mock,
+        service: PackageRepositoryService,
+    ) -> None:
+        repository_mock.get_by_id.return_value = TEST_PACKAGE_REPO
+        repository_mock.update_by_id.return_value = TEST_PACKAGE_REPO
+        events_service_mock.record_event.return_value = None
+        builder = PackageRepositoryBuilder(name="foo")
+        await service.update_by_id(id=1, builder=builder)
+        events_service_mock.record_event.assert_called_once_with(
+            event_type=EventTypeEnum.SETTINGS,
+            event_description=f"Updated package repository {TEST_PACKAGE_REPO.name}",
+        )
+
+    async def test_delete_creates_event(
+        self,
+        repository_mock: Mock,
+        events_service_mock: Mock,
+        service: PackageRepositoryService,
+    ) -> None:
+        repository_mock.delete_by_id.return_value = TEST_PACKAGE_REPO
+        events_service_mock.record_event.return_value = None
+        await service.delete_by_id(id=1)
+        events_service_mock.record_event.assert_called_once_with(
+            event_type=EventTypeEnum.SETTINGS,
+            event_description=f"Deleted package repository {TEST_PACKAGE_REPO.name}",
+        )

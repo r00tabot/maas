@@ -21,7 +21,7 @@ from maasapiserver.v3.api.public.models.requests.query import PaginationParams
 from maasapiserver.v3.api.public.models.responses.base import (
     OPENAPI_ETAG_HEADER,
 )
-from maasapiserver.v3.api.public.models.responses.package_repositories import (
+from maasapiserver.v3.api.public.models.responses.packagerepositories import (
     PackageRepositoryListResponse,
     PackageRepositoryResponse,
 )
@@ -31,7 +31,7 @@ from maasservicelayer.auth.jwt import UserRole
 from maasservicelayer.services import ServiceCollectionV3
 
 
-class PackageRepoHandler(Handler):
+class PackageRepositoriesHandler(Handler):
     """Package repositories handler."""
 
     TAGS = ["Package repositories"]

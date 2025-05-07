@@ -5,7 +5,10 @@ from operator import eq
 
 from sqlalchemy import select, Table
 
-from maascommon.package_repository import PackageRepositoryConstants
+from maascommon.enums.package_repositories import (
+    PACKAGE_REPO_MAIN_ARCHES,
+    PACKAGE_REPO_PORTS_ARCHES,
+)
 from maasservicelayer.db.repositories.base import BaseRepository
 from maasservicelayer.db.tables import PackageRepositoryTable
 from maasservicelayer.models.packagerepositories import PackageRepository
@@ -20,9 +23,7 @@ class PackageRepositoryRepository(BaseRepository[PackageRepository]):
 
     async def get_main_archive(self) -> PackageRepository:
         stmt = select(PackageRepositoryTable).where(
-            PackageRepositoryTable.c.arches.in_(
-                PackageRepositoryConstants.MAIN_ARCHES
-            ),
+            PackageRepositoryTable.c.arches.contains(PACKAGE_REPO_MAIN_ARCHES),
             eq(PackageRepositoryTable.c.enabled, True),
             eq(PackageRepositoryTable.c.default, True),
         )
@@ -33,8 +34,8 @@ class PackageRepositoryRepository(BaseRepository[PackageRepository]):
 
     async def get_ports_archive(self) -> PackageRepository:
         stmt = select(PackageRepositoryTable).where(
-            PackageRepositoryTable.c.arches.in_(
-                PackageRepositoryConstants.PORTS_ARCHES
+            PackageRepositoryTable.c.arches.contains(
+                PACKAGE_REPO_PORTS_ARCHES
             ),
             eq(PackageRepositoryTable.c.enabled, True),
             eq(PackageRepositoryTable.c.default, True),

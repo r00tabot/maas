@@ -15,6 +15,7 @@ from maasservicelayer.models.packagerepositories import PackageRepository
 
 class PackageRepositoryResponse(HalResponse[BaseHal]):
     kind = "PackageRepository"
+    id: int
     name: str
     key: str
     url: PackageRepoUrl
@@ -24,14 +25,15 @@ class PackageRepositoryResponse(HalResponse[BaseHal]):
     disabled_pockets: list[str]
     disabled_components: list[str]
     disable_sources: bool
-    default: bool
     enabled: bool
+    # the 'default' field is excluded from the response
 
     @classmethod
     def from_model(
         cls, package_repository: PackageRepository, self_base_hyperlink: str
     ) -> Self:
         return cls(
+            id=package_repository.id,
             name=package_repository.name,
             key=package_repository.key,
             url=package_repository.url,
@@ -41,7 +43,6 @@ class PackageRepositoryResponse(HalResponse[BaseHal]):
             disabled_pockets=package_repository.disabled_pockets,
             disabled_components=package_repository.disabled_components,
             disable_sources=package_repository.disable_sources,
-            default=package_repository.default,
             enabled=package_repository.enabled,
             hal_links=BaseHal(
                 self=BaseHref(

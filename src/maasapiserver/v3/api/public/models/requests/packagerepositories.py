@@ -9,9 +9,9 @@ from maascommon.enums.package_repositories import (
     ComponentsToDisableEnum,
     KnownArchesEnum,
     KnownComponentsEnum,
-    MainArchesEnum,
+    PACKAGE_REPO_MAIN_ARCHES,
+    PACKAGE_REPO_PORTS_ARCHES,
     PocketsToDisableEnum,
-    PortsArchesEnum,
 )
 from maasservicelayer.builders.packagerepositories import (
     PackageRepositoryBuilder,
@@ -60,33 +60,50 @@ class PackageRepositoryCreateRequest(BaseModel):
     def populate_arches_if_empty(cls, values: dict[str, Any]):
         if len(values["arches"]) == 0:
             if values["name"] == "ports_archive":
-                values["arches"] = set(PortsArchesEnum.__members__)
+                values["arches"] = PACKAGE_REPO_PORTS_ARCHES
             else:
-                values["arches"] = set(MainArchesEnum.__members__)
+                values["arches"] = PACKAGE_REPO_MAIN_ARCHES
         return values
 
-    @classmethod
-    def to_builder(cls, is_default: bool = False) -> PackageRepositoryBuilder:
+    def to_builder(self, is_default: bool = False) -> PackageRepositoryBuilder:
         return PackageRepositoryBuilder(
-            name=cls.name,
-            key=cls.key,
-            url=cls.url,
-            distributions=cls.distributions,
-            components=cls.components,
-            arches=cls.arches,
-            disabled_pockets=cls.disabled_pockets,
-            disabled_components=cls.disabled_components,
-            disable_sources=cls.disable_sources,
-            enabled=cls.enabled,
+            name=self.name,
+            key=self.key,  # pyright: ignore [reportArgumentType]
+            url=self.url,
+            distributions=self.distributions,
+            components=self.components,
+            arches=self.arches,
+            disabled_pockets=self.disabled_pockets,
+            disabled_components=self.disabled_components,
+            disable_sources=self.disable_sources,
+            enabled=self.enabled,
+            default=is_default,
         )
 
 
 class PackageRepositoryUpdateRequest(PackageRepositoryCreateRequest):
-    @classmethod
-    def to_builder(cls, is_default: bool = False) -> PackageRepositoryBuilder:
-        if is_default and not cls.enabled:
+    def validate_components(self, is_default: bool) -> None:
+        if is_default and len(self.components) > 0:
+            raise ValidationException.build_for_field(
+                "components",
+                message="This is a default Ubuntu repository. Please update "
+                "'disabled_components' instead.",
+            )
+        if not is_default and len(self.disabled_components) > 0:
+            raise ValidationException.build_for_field(
+                "disabled_components",
+                message="This is a custom Ubuntu repository. Please update "
+                "'components' instead.",
+            )
+
+    def validate_enabled(self, is_default: bool) -> None:
+        if is_default and not self.enabled:
             raise ValidationException.build_for_field(
                 field="enabled",
                 message="Default repositories may not be disabled.",
             )
-        return super().to_builder()
+
+    def to_builder(self, is_default: bool = False) -> PackageRepositoryBuilder:
+        self.validate_components(is_default)
+        self.validate_enabled(is_default)
+        return super().to_builder(is_default)

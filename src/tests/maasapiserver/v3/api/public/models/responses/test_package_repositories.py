@@ -2,7 +2,7 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 
-from maasapiserver.v3.api.public.handlers.packagerepositories import (
+from maasapiserver.v3.api.public.handlers.package_repositories import (
     PackageRepositoryResponse,
 )
 from maasservicelayer.models.fields import PackageRepoUrl
@@ -25,8 +25,8 @@ class TestPackageRepositoryResponse:
             disabled_pockets=set(),
             disabled_components=set(),
             disable_sources=False,
-            default=True,
-            enabled=False,
+            default=False,
+            enabled=True,
         )
         response = PackageRepositoryResponse.from_model(
             package_repository=package_repo, self_base_hyperlink="http://test/"
@@ -41,6 +41,5 @@ class TestPackageRepositoryResponse:
         assert response.disabled_pockets == package_repo.disabled_pockets
         assert response.disabled_components == package_repo.disabled_components
         assert response.disable_sources == package_repo.disable_sources
-        assert response.default == package_repo.default
         assert response.enabled == package_repo.enabled
         assert response.hal_links.self.href == "http://test/1"
