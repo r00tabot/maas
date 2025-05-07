@@ -1,0 +1,45 @@
+name: Integration tests
+
+on:
+  pull_request_target:
+    types: [ labeled ]
+
+jobs:
+  snap:
+    if: contains(github.event.pull_request.labels.*.name, 'integration-tests')
+    timeout-minutes: 120
+    runs-on: [self-hosted, large-runner] 
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
+        fetch-depth: 0        
+        submodules: 'true'
+    - name: Clone test repo
+      run: |
+        git clone https://github.com/r00ta/r00tabot-runner-config.git /tmp/r00tabot-runner-config
+        git config --global --add safe.directory /tmp/r00tabot-runner-config
+    - name: chmod
+      run: find /tmp/r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
+    - name: test
+      run: TYPE=snap /tmp/r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD
+  deb:
+    if: contains(github.event.pull_request.labels.*.name, 'integration-tests')
+    timeout-minutes: 120
+    runs-on: [self-hosted, large-runner] 
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
+        fetch-depth: 0        
+        submodules: 'true'
+    - name: Clone test repo
+      run: |
+        git clone https://github.com/r00ta/r00tabot-runner-config.git /tmp/r00tabot-runner-config
+        git config --global --add safe.directory /tmp/r00tabot-runner-config
+    - name: chmod
+      run: find /tmp/r00tabot-runner-config -type f -iname "*.sh" -exec chmod +x {} +
+    - name: test
+      run: TYPE=deb /tmp/r00tabot-runner-config/pipeline/execute.sh --maas_dir $PWD

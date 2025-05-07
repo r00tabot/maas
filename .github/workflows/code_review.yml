@@ -1,0 +1,33 @@
+name: Smart code review
+on:
+  pull_request_target:
+    types: [ labeled ]
+    
+permissions:
+  contents: read   
+  pull-requests: write
+
+jobs:
+  test-action:
+    if: ${{ github.event.label.name == 'autoreview' }}
+    runs-on: [self-hosted, tester] 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: "refs/pull/${{ github.event.number }}/merge"
+          fetch-depth: 0
+      - name: Run Container Action
+        uses: spaghettihub/llm_code_reviewer@main
+        with:
+          # fixed field
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_owner: ${{ github.repository_owner }}
+          github_repository: ${{ github.repository }}
+          pr_number: ${{ github.event.pull_request.number }}
+          pr_title: ${{ github.event.pull_request.title }}
+          pr_body: ${{ github.event.pull_request.body }}
+          ollama_api_url: ${{ secrets.OLLAMA_ADDRESS }}
+          ollama_model: 'qwen2.5-coder:32b'
+          prompt_type: 'GENERAL_REVIEW'
+          prompt_language: 'EN'

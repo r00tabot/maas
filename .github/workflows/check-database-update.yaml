@@ -1,0 +1,42 @@
+name: Check database update diff
+
+on:
+  pull_request_target:
+    types: [ labeled ]
+
+jobs:
+  run:
+    if: ${{ github.event.label.name == 'check-database' }}
+    runs-on: [self-hosted, tester] 
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup proxy
+      run: echo "Acquire::http::Proxy \"http://172.0.2.161:8000\";" | sudo tee /etc/apt/apt.conf.d/00proxy
+    - name: Install make
+      run: sudo apt-get update && sudo apt-get install make
+    - name: Install deps
+      run: make install-dependencies
+    - name: Build
+      run: make build
+    - name: Create env
+      run: |
+        echo "TMPDIR=$(mktemp -d)" >> $GITHUB_ENV
+    - name: Check diff 
+      run: |
+          make update-initial-sql
+          git diff --color > /tmp/db.diff
+          if test -s /tmp/db.diff; then
+              # Pull the db.diff file from the container to the host
+              printf '%s\n%s\n%s' "```diff" "$(cat /tmp/db.diff)" "```" > /tmp/db.diff
+              echo "diff_exists=true" >> $GITHUB_ENV
+          else
+              echo "diff_exists=false" >> $GITHUB_ENV
+          fi
+    - name: Create comment
+      if: env.diff_exists == 'true'
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        body-path: '/tmp/db.diff'
+        reactions: rocket 

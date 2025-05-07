@@ -1,0 +1,65 @@
+name: Codecov
+
+on:
+  push:
+    branches:
+      - master
+  pull_request_target:
+    types: [ labeled ]
+
+jobs:
+  run:  
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage')
+    runs-on: [self-hosted, tester] 
+    steps:
+    - uses: actions/checkout@v4
+      if: github.event_name == 'push'
+    - name: Checkout
+      if: contains(github.event.pull_request.labels.*.name, 'coverage')
+      uses: actions/checkout@v4
+      with:
+        ref: "refs/pull/${{ github.event.number }}/merge"
+        fetch-depth: 0        
+    - name: Setup proxy
+      run: echo "Acquire::http::Proxy \"http://172.0.2.161:8000\";" | sudo tee /etc/apt/apt.conf.d/00proxy
+    - name: Install make
+      run: sudo apt-get update && sudo apt-get install make 
+    - name: Install deps
+      run: |
+        make install-dependencies 
+        go install github.com/axw/gocov/gocov@latest 
+        go install github.com/AlekSi/gocov-xml@latest
+        make
+        sh -c ". .ve/bin/activate && pip install coverage gevent && deactivate"
+    - name: Legacy region coverage
+      continue-on-error: true
+      run: bin/test.region.legacy --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-legacy-region.xml
+    - name: Region coverage
+      continue-on-error: true
+      run: bin/test.region --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-region.xml
+    - name: Rack coverage
+      continue-on-error: true
+      run: bin/test.rack --with-coverage --cover-xml --cover-branches --cover-xml-file=./coverage-rack.xml
+    - name: pytest coverage
+      continue-on-error: true
+      run: sh -c ". .ve/bin/activate && coverage run -a --source=. --concurrency=gevent --branch --data-file=./coverage-pytest -m pytest && coverage xml -i --data-file coverage-pytest" 
+    - name: go coverage
+      continue-on-error: true
+      run: |
+        make test-go-cover
+        cd src/maasagent
+        ~/go/bin/gocov convert cover.out | ~/go/bin/gocov-xml > coverage-maasagent.xml
+        mv coverage-maasagent.xml ../../
+        cd ../host-info
+        ~/go/bin/gocov convert cover.out | ~/go/bin/gocov-xml > coverage-host-info.xml
+        mv coverage-host-info.xml ../../
+        cd ../../
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        flags: smart-tests
+        verbose: true
+        directory: .
+        files: coverage-legacy-region.xml, coverage-region.xml, coverage-rack.xml, coverage.xml, coverage-maasagent.xml, coverage-host-info.xml
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
