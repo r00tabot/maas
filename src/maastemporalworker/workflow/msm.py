@@ -33,6 +33,7 @@ from maascommon.workflows.msm import (
     MSMTokenRefreshParam,
 )
 from maasservicelayer.db import Database
+from maasservicelayer.models.secrets import MSMConnectorSecret
 from maasservicelayer.services import CacheForServices
 from maastemporalworker.workflow.activity import ActivityBase
 from maastemporalworker.workflow.utils import (
@@ -46,7 +47,6 @@ HEARTBEAT_TIMEOUT = timedelta(seconds=10)
 MSM_TIMEOUT = timedelta(minutes=15)
 MSM_REFRESH_RETRY_INTERVAL = timedelta(minutes=1)
 MSM_POLL_INTERVAL = timedelta(minutes=1)
-MSM_SECRET = "msm-connector"
 
 MSM_ENROL_EP = "/site/v1/enroll"
 MSM_DETAIL_EP = "/site/v1/details"
@@ -72,6 +72,8 @@ class MSMTokenVerifyParam:
 
 
 class MSMConnectorActivity(ActivityBase):
+    MSM_CONNECTOR_SECRET = MSMConnectorSecret()
+
     def __init__(
         self,
         db: Database,
@@ -209,7 +211,7 @@ class MSMConnectorActivity(ActivityBase):
 
         async with self.start_transaction() as services:
             await services.secrets.set_composite_secret(
-                f"global/{MSM_SECRET}",
+                self.MSM_CONNECTOR_SECRET,
                 {
                     "url": input.url,
                     "jwt": input.jwt,
@@ -226,7 +228,7 @@ class MSMConnectorActivity(ActivityBase):
         """
         async with self.start_transaction() as services:
             return await services.secrets.get_composite_secret(
-                f"global/{MSM_SECRET}"
+                self.MSM_CONNECTOR_SECRET
             )
 
     @activity_defn_with_context(name=MSM_GET_HEARTBEAT_DATA_ACTIVITY_NAME)
