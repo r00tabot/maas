@@ -13,7 +13,7 @@ from maascommon.enums.package_repositories import (
     PACKAGE_REPO_PORTS_ARCHES,
     PocketsToDisableEnum,
 )
-from maasservicelayer.builders.packagerepositories import (
+from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
 from maasservicelayer.exceptions.catalog import ValidationException

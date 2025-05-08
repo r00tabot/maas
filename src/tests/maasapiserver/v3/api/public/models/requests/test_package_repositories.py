@@ -1,6 +1,7 @@
 # Copyright 2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from pydantic import ValidationError
 import pytest
 
 from maasapiserver.v3.api.public.models.requests.package_repositories import (
@@ -45,6 +46,35 @@ class TestPackageRepositoryCreateRequest:
         assert b.disabled_components == r.disabled_components
         assert b.enabled == r.enabled
         assert b.default is False
+
+    @pytest.mark.parametrize(
+        "url, should_raise",
+        [
+            ("ppa:foo/bar", False),
+            ("ppa:123/456", False),
+            ("ppa:foo-123/bar.4-5+6", False),
+            ("ppa:ab/bar", True),  # username too short
+            ("ppa:abc_/bar", True),  # invalid chars in username
+            ("ppa:foo/bar_", True),  # invalid chars in repo
+            ("http://foo.bar", False),
+            ("http://foo.bar/path?id=1", False),
+            ("https://foo-foo.bar/", False),
+            ("https://foo.bar.foo.bar/path/to/file", False),
+            ("ftp://foo.bar", True),  # invalid protocol
+            ("http:/foo.bar", True),  # missing slash
+            ("http//foo.bar", True),  # missing colon
+        ],
+    )
+    def test_validate_ppa_url(self, url: str, should_raise: bool) -> None:
+        if should_raise:
+            with pytest.raises(ValidationError):
+                PackageRepositoryCreateRequest(
+                    name="name", url=url, disable_sources=True
+                )
+        else:
+            PackageRepositoryCreateRequest(
+                name="name", url=url, disable_sources=True
+            )
 
 
 class TestPackageRepositoryUpdateRequest:

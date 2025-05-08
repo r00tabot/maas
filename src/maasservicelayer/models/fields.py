@@ -5,7 +5,7 @@ from ipaddress import _BaseNetwork, IPv4Network, IPv6Network
 import re
 from typing import Any, Union
 
-from pydantic.networks import NetworkType, url_regex
+from pydantic.networks import NetworkType
 
 from maascommon.fields import MAC_FIELD_RE, normalise_macaddress
 
@@ -77,9 +77,13 @@ class PackageRepoUrl(str):
     OR, they are an http(s) URL.
     """
 
-    PPA_RE = re.compile(r"^ppa:[a-z0-9\-]{3,32}/[a-z0-9]{1}[a-z0-9\.\-\+]+$")
-    URL_RE = url_regex()
-    COMBINED_RE = re.compile(rf"{PPA_RE.pattern}|{URL_RE.pattern}")
+    PPA_RE = r"^ppa:[a-z0-9\-]{3,32}/[a-z0-9]{1}[a-z0-9\.\-\+]+$"
+    URL_RE = r"^https?:\/\/\w[\w\-]+(\.[\w\-]+)+(\/([\w\-_%.#?=&+])+)*\/?$"
+    COMBINED_RE = re.compile(rf"{PPA_RE}|{URL_RE}")
+
+    def __new__(cls, content):
+        content = cls.validate(content)
+        return str.__new__(cls, content)
 
     @classmethod
     def __get_validators__(cls):
