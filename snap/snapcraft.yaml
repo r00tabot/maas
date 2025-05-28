@@ -80,6 +80,13 @@ parts:
 
   maas:
     plugin: python
+    # By default, the Python plugin installs pip, setuptools, and wheel into the Snap.
+    # This behavior is defined here:
+    # https://github.com/canonical/snapcraft/blob/2a3f235df5b358c7973d0b72f490a48a6fe8625b/snapcraft_legacy/plugins/v2/python.py#L97
+    #
+    # We override this by setting `python-packages` to an empty list. This ensures
+    # the Snap uses only packages from apt.
+    python-packages: []
     source: .
     build-packages:
       - build-essential
@@ -158,6 +165,7 @@ parts:
       - python3-petname
       - python3-pexpect
       - python3-pip
+      - python3-pkg-resources
       - python3-prometheus-client
       - python3-protobuf # for macaroonbakery
       - python3-psycopg2
