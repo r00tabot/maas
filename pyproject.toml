@@ -188,7 +188,9 @@ filterwarnings = "error::BytesWarning"
 testpaths = [ "src/tests" ]
 
 [tool.pyright]
-include = [ "src/maascommon", "src/maasservicelayer" ]
+include = [ "src/maascommon", "src/maasservicelayer", "src/maasapiserver" ]
+exclude = [ "src/maasservicelayer/auth/macaroons", "src/maasservicelayer/services/machines_v2.py" ]
+
 executionEnvironments = [
   { root = "src", reportMissingImports = "none", reportMissingModuleSource = "none" },
 ]

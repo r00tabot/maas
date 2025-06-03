@@ -199,7 +199,7 @@ class UsersRepository(BaseRepository[User]):
         )
         if query:
             total_stmt = query.enrich_stmt(total_stmt)
-        total = (await self.execute_stmt(total_stmt)).scalar()
+        total = (await self.execute_stmt(total_stmt)).scalar_one()
 
         stmt = (
             select(self.get_repository_table())
@@ -232,7 +232,7 @@ class UsersRepository(BaseRepository[User]):
             )
         )
         total_stmt = query.enrich_stmt(total_stmt)
-        total = (await self.execute_stmt(total_stmt)).scalar()
+        total = (await self.execute_stmt(total_stmt)).scalar_one()
         stmt = (
             select(
                 UserTable.c.id,

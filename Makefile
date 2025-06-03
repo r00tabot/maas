@@ -254,7 +254,7 @@ lint-shell:
 .PHONY: lint-shell
 
 check-types:
-	@tox -e check-types
+	pyright --stats
 .PHONY: check-types
 
 format.parallel:
