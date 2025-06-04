@@ -31,7 +31,7 @@ from maasserver.models.node import RegionController
 from maasserver.models.timestampedmodel import TimestampedModel
 from maasserver.utils.bootresource import LocalBootResourceFile
 from maasserver.workflow import execute_workflow
-from maasserver.workflow.bootresource import (
+from maastemporalworker.workflow.bootresource import (
     DELETE_BOOTRESOURCE_WORKFLOW_NAME,
     ResourceDeleteParam,
     ResourceIdentifier,

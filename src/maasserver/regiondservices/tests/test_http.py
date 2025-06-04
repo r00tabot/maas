@@ -7,6 +7,8 @@ from unittest.mock import Mock
 
 from twisted.internet.defer import inlineCallbacks
 
+import maascommon.worker as worker_module
+from maascommon.worker import get_worker_ids
 from maasserver.listener import notify, PostgresListenerUnregistrationError
 from maasserver.models import Config
 from maasserver.regiondservices import certificate_expiration_check, http
@@ -66,7 +68,11 @@ class TestRegionHTTPService(
         # MAASDataFixture updates `MAAS_DATA` in the environment to point to this new location.
         data_path = os.getenv("MAAS_DATA")
         boot_resources_dir = f"{data_path}/image-storage"
-        http.REGIOND_SOCKET_PATH = f"{data_path}/maas-regiond-webapp.sock"
+        self.patch(
+            worker_module,
+            "REGIOND_SOCKET_PATH",
+            f"{data_path}/maas-regiond-webapp.sock",
+        )
 
         tempdir = self.make_dir()
         nginx_conf = Path(tempdir) / "regiond.nginx.conf"
@@ -84,7 +90,7 @@ class TestRegionHTTPService(
 
         nginx_config = nginx_conf.read_text()
 
-        worker_ids = WorkersService.get_worker_ids()
+        worker_ids = get_worker_ids()
         for worker_id in worker_ids:
             self.assertIn(
                 f"{data_path}/maas-regiond-webapp.sock.{worker_id};",
@@ -115,7 +121,11 @@ class TestRegionHTTPService(
                 "MAAS_DATA": data_path,
             },
         )
-        http.REGIOND_SOCKET_PATH = "/snap/maas/maas-regiond-webapp.sock"
+        self.patch(
+            worker_module,
+            "REGIOND_SOCKET_PATH",
+            "/snap/maas/maas-regiond-webapp.sock",
+        )
         boot_resources_dir = f"{data_path}/image-storage"
 
         tempdir = self.make_dir()
@@ -133,7 +143,7 @@ class TestRegionHTTPService(
         service._configure(http._Configuration(cert=cert, port=5443))
 
         nginx_config = nginx_conf.read_text()
-        worker_ids = WorkersService.get_worker_ids()
+        worker_ids = get_worker_ids()
         for worker_id in worker_ids:
             self.assertIn(
                 f"server unix:/snap/maas/maas-regiond-webapp.sock.{worker_id};",
