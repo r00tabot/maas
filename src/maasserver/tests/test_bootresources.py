@@ -66,7 +66,7 @@ from maasserver.utils.orm import (
     transactional,
 )
 from maasserver.utils.threads import deferToDatabase
-from maasserver.workflow.bootresource import ResourceDownloadParam
+from maastemporalworker.workflow.bootresource import ResourceDownloadParam
 from maastesting import get_testing_timeout
 from maastesting.crochet import wait_for
 from maastesting.testcase import MAASTestCase

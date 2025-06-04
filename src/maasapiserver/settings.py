@@ -1,4 +1,4 @@
-# Copyright 2023-2024 Canonical Ltd.  This software is licensed under the
+# Copyright 2023-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from dataclasses import dataclass
@@ -22,6 +22,7 @@ class Config:
     debug: bool = False
     debug_queries: bool = False
     debug_http: bool = False
+    num_workers: int = 4
 
 
 def api_service_socket_path() -> Path:
@@ -93,7 +94,7 @@ async def read_config() -> Config:
             debug = config.debug
             debug_queries = debug or config.debug_queries
             debug_http = debug or config.debug_http
-
+            num_workers = config.num_workers
     except (FileNotFoundError, KeyError, ValueError):
         # The regiond.conf will attempt to be loaded when the 'maas' command
         # is read by a standard user. We allow this to fail and miss configure the
@@ -106,6 +107,7 @@ async def read_config() -> Config:
 
     return Config(
         db=database_config,
+        num_workers=num_workers,
         debug=debug,
         debug_queries=debug_queries,
         debug_http=debug_http,

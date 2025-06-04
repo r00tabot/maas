@@ -10,7 +10,7 @@ import uuid
 from temporalio.service import RPCError
 from twisted.internet.defer import Deferred, succeed
 
-from maasserver.workflow.worker import get_client_async, REGION_TASK_QUEUE
+from maastemporalworker.worker import get_client_async, REGION_TASK_QUEUE
 from provisioningserver.utils.twisted import asynchronous, FOREVER
 
 

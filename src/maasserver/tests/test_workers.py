@@ -11,11 +11,8 @@ from unittest.mock import call
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 
-from maasserver.workers import (
-    set_max_workers_count,
-    WorkerProcess,
-    WorkersService,
-)
+from maascommon.worker import set_max_workers_count
+from maasserver.workers import WorkerProcess, WorkersService
 from maastesting.crochet import wait_for
 from maastesting.testcase import MAASTestCase
 from provisioningserver.utils.twisted import DeferredValue
