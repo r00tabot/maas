@@ -13,9 +13,12 @@ from piston3.handler import typemapper
 from piston3.utils import rc
 
 from maasserver.api.support import OperationsHandler
+from maasserver.audit import create_audit_event
+from maasserver.enum import ENDPOINT
 from maasserver.exceptions import MAASAPIValidationError
 from maasserver.forms import BootSourceForm
 from maasserver.models import BootSource
+from provisioningserver.events import EVENT_TYPES
 
 DISPLAYED_BOOTSOURCE_FIELDS = (
     "id",
@@ -86,7 +89,14 @@ class BootSourceHandler(OperationsHandler):
             data=request.data, files=request.FILES, instance=boot_source
         )
         if form.is_valid():
-            return form.save()
+            updated_boot_source = form.save()
+            create_audit_event(
+                event_type=EVENT_TYPES.BOOT_SOURCE,
+                endpoint=ENDPOINT.API,
+                request=request,
+                description=f"Updated boot source {updated_boot_source.url}",
+            )
+            return updated_boot_source
         else:
             raise MAASAPIValidationError(form.errors)
 
@@ -105,6 +115,13 @@ class BootSourceHandler(OperationsHandler):
         """
         boot_source = get_object_or_404(BootSource, id=id)
         boot_source.delete()
+        create_audit_event(
+            event_type=EVENT_TYPES.BOOT_SOURCE,
+            endpoint=ENDPOINT.API,
+            request=request,
+            description=f"Deleted boot source {boot_source.url}",
+        )
+
         return rc.DELETED
 
     @classmethod
@@ -165,6 +182,12 @@ class BootSourcesHandler(OperationsHandler):
         form = BootSourceForm(data=request.data, files=request.FILES)
         if form.is_valid():
             boot_source = form.save()
+            create_audit_event(
+                event_type=EVENT_TYPES.BOOT_SOURCE,
+                endpoint=ENDPOINT.API,
+                request=request,
+                description=f"Created boot source {boot_source.url}",
+            )
             handler = BootSourceHandler()
             emitter = JSONEmitter(
                 boot_source, typemapper, handler, handler.fields, False
