@@ -885,12 +885,12 @@ class Wedge(BMCConfig):
             switch_type = self._detect_known_switch()
         except (CalledProcessError, TimeoutExpired, FileNotFoundError) as err:
             print(
-                f"ERROR: Exception occurred when trying to detect switch: {str(err)}."
+                f"ERROR: Exception occurred when trying to detect switch: {str(err)}"
             )
             return False
         else:
             if switch_type is None:
-                print("WARNING: Unknown switch detected.")
+                print("ERROR: Unknown switch detected.")
                 return False
         try:
             # Second, lets verify if this is a known endpoint
@@ -1257,7 +1257,8 @@ class Redfish(IPMIBase):
 def detect_and_configure(args, bmc_config_path: str) -> None:
     # Order matters here. HPMoonshot is a specical IPMI device, so try to
     # detect it first.
-    for bmc_class in [HPMoonshot, Redfish, IPMI, Wedge]:
+    bmc_list = [HPMoonshot, Redfish, IPMI, Wedge]
+    for bmc_class in bmc_list:
         try:
             bmc = bmc_class(**vars(args))
             print(f"INFO: Checking for {bmc}...")
@@ -1276,7 +1277,10 @@ def detect_and_configure(args, bmc_config_path: str) -> None:
                     )
                 return
             else:
-                print(f"INFO: No {bmc} detected. Trying next BMC type...")
+                msg = f"INFO: No {bmc} detected."
+                if bmc_class is not bmc_list[-1]:
+                    msg += " Trying next BMC type..."
+                print(msg)
         except Exception as e:
             print(f"ERROR: {bmc_class.__name__} {e}\n{traceback.format_exc()}")
     print("INFO: No BMC automatically detected!")
