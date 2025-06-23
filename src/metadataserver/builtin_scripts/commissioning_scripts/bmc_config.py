@@ -1055,8 +1055,17 @@ class Redfish(IPMIBase):
         if data is None:
             raise ConfigurationError("Missing SMBIOS data")
 
-        vendor_id = get_smbios_value(data, "idVendor")[2:]
-        product_id = get_smbios_value(data, "idProduct")[2:]
+        vendor_id = get_smbios_value(data, "idVendor")
+        if vendor_id is None:
+            raise ConfigurationError("'idVendor' key not present in SMBIOS data")
+        else:
+            vendor_id = vendor_id[2:]
+
+        product_id = get_smbios_value(data, "idProduct")
+        if product_id is None:
+            raise ConfigurationError("'idProduct' key not present in SMBIOS data")
+        else:
+            product_id = product_id[2:]
 
         if not all((vendor_id, product_id)):
             raise ConfigurationError(
