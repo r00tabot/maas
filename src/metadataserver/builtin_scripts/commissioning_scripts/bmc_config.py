@@ -5,7 +5,7 @@
 # Author: Andres Rodriguez <andres.rodriguez@canonical.com>
 #         Lee Trager <lee.trager@canonical.com>
 #
-# Copyright (C) 2013-2021 Canonical
+# Copyright (C) 2013-2025 Canonical
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -538,7 +538,9 @@ class IPMI(IPMIBase):
         try:
             output = _get_ipmi_locate_output()
         except Exception as err:
-            print(f"ERROR: Exception occurred when trying to execute ipmi-locate command: {str(err)}")
+            print(
+                f"ERROR: Exception occurred when trying to execute ipmi-locate command: {str(err)}"
+            )
             return False
         else:
             m = re.search(r"(IPMI\ Version:) (\d\.\d)", output)
@@ -548,7 +550,9 @@ class IPMI(IPMIBase):
             if m or len(glob.glob("/dev/ipmi[0-9]")):
                 return True
             else:
-                print("ERROR: Could not find IPMI version or an IPMI device in /dev")
+                print(
+                    "ERROR: Could not find IPMI version or an IPMI device in /dev"
+                )
                 return False
 
     def configure(self):
@@ -705,14 +709,18 @@ class HPMoonshot(BMCConfig):
                 stderr=DEVNULL,
             ).decode()
         except Exception as err:
-            print(f"ERROR: Exception occurred executing ipmitool command: {str(err)}")
+            print(
+                f"ERROR: Exception occurred executing ipmitool command: {str(err)}"
+            )
             return False
         # 14 is the code that identifies the BMC as HP Moonshot
         device_id = output.split()[0]
         if device_id == "14":
             return True
         else:
-            print(f"ERROR: Detected BMC is not HP Moonshot, has device ID {device_id}")
+            print(
+                f"ERROR: Detected BMC is not HP Moonshot, has device ID {device_id}"
+            )
             return False
 
     def _get_local_address(self):
@@ -876,7 +884,9 @@ class Wedge(BMCConfig):
         try:
             switch_type = self._detect_known_switch()
         except (CalledProcessError, TimeoutExpired, FileNotFoundError) as err:
-            print(f"ERROR: Exception occurred when trying to detect switch: {str(err)}.")
+            print(
+                f"ERROR: Exception occurred when trying to detect switch: {str(err)}."
+            )
             return False
         else:
             if switch_type is None:
@@ -1067,7 +1077,9 @@ class Redfish(IPMIBase):
             raise
         except Exception as e:
             # Catch any other exception and raise a wrapping ConfigurationError
-            raise ConfigurationError("Failed to get network interface for Redfish") from e
+            raise ConfigurationError(
+                "Failed to get network interface for Redfish"
+            ) from e
 
         self._configure_network(iface, data)
 
@@ -1088,7 +1100,9 @@ class Redfish(IPMIBase):
             return self.get_bmc_ip() is not None
         # XXX: we should know which exceptions to expect, so we can handle them
         except ConfigurationError as err:
-            print(f"ERROR: Redfish detection and configuration failed. Reason: {str(err)}")
+            print(
+                f"ERROR: Redfish detection and configuration failed. Reason: {str(err)}"
+            )
             return False
 
     def _get_manager_id(self):
