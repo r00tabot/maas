@@ -15,7 +15,6 @@ from maasserver.enum import (
     BOOT_RESOURCE_TYPE,
     NODE_STATUS,
 )
-from maasserver.import_images.boot_image_mapping import BootImageMapping
 from maasserver.import_images.testing.factory import (
     make_image_spec,
     set_resource,
@@ -35,7 +34,6 @@ from maasserver.testing.testcase import (
     MAASServerTestCase,
     MAASTransactionServerTestCase,
 )
-from maasserver.utils import get_maas_user_agent
 from maasserver.utils.converters import human_readable_bytes
 from maasserver.utils.orm import get_one, reload_object
 from maasserver.websockets.base import (
@@ -45,6 +43,7 @@ from maasserver.websockets.base import (
 )
 from maasserver.websockets.handlers import bootresource
 from maasserver.websockets.handlers.bootresource import BootResourceHandler
+from maasservicelayer.utils.images.boot_image_mapping import BootImageMapping
 from provisioningserver.config import DEFAULT_IMAGES_URL, DEFAULT_KEYRINGS_PATH
 from provisioningserver.events import EVENT_TYPES
 
@@ -1395,9 +1394,7 @@ class TestBootResourceFetch(MAASServerTestCase):
         mock_set_env.assert_called_once()
         mock_write_keyrings.assert_called_once_with(ANY, [expected_source])
 
-        mock_download.assert_called_once_with(
-            [expected_source], user_agent=get_maas_user_agent()
-        )
+        mock_download.assert_called_once_with([expected_source])
 
     def test_url_without_trailing_slash(self):
         owner = factory.make_admin()
