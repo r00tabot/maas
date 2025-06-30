@@ -34,6 +34,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from twisted.python.failure import Failure
 
 from maascommon.constants import IMPORT_RESOURCES_SERVICE_PERIOD
+from maascommon.utils.fs import tempdir
 from maasserver import locks
 from maasserver.bootsources import (
     cache_boot_sources,
@@ -58,13 +59,7 @@ from maasserver.eventloop import services
 from maasserver.import_images.download_descriptions import (
     download_all_image_descriptions,
     image_passes_filter,
-    validate_product,
 )
-from maasserver.import_images.helpers import (
-    get_os_from_product,
-    get_signing_policy,
-)
-from maasserver.import_images.keyrings import write_all_keyrings
 from maasserver.import_images.product_mapping import map_products
 from maasserver.models import (
     BootResource,
@@ -101,6 +96,12 @@ from maasserver.workflow import (
     execute_workflow,
     REGION_TASK_QUEUE,
 )
+from maasservicelayer.utils.images.helpers import (
+    get_os_from_product,
+    get_signing_policy,
+)
+from maasservicelayer.utils.images.keyrings import write_all_keyrings
+from maasservicelayer.utils.images.repo_dumper import validate_product
 from maastemporalworker.workflow.bootresource import (
     DOWNLOAD_TIMEOUT,
     ResourceDownloadParam,
@@ -114,7 +115,6 @@ from provisioningserver.events import EVENT_TYPES
 from provisioningserver.logger import get_maas_logger, LegacyLogger
 from provisioningserver.path import get_maas_lock_path
 from provisioningserver.utils import snap
-from provisioningserver.utils.fs import tempdir
 from provisioningserver.utils.shell import ExternalProcessError
 from provisioningserver.utils.twisted import (
     asynchronous,
@@ -1017,21 +1017,18 @@ def _import_resources_internal(notify=None):
             for source in sources:
                 if source["url"].startswith(msm.get("sm-url")):
                     ensure_all_images_selected(source)
+
         sources = write_all_keyrings(keyrings_path, sources)
+
         msg = (
             f"Started importing of boot images from {len(sources)} source(s)."
         )
         Event.objects.create_region_event(EVENT_TYPES.REGION_IMPORT_INFO, msg)
         maaslog.info(msg)
 
-        image_descriptions = download_all_image_descriptions(
-            sources, get_maas_user_agent()
-        )
+        image_descriptions = download_all_image_descriptions(sources)
         if image_descriptions.is_empty():
-            msg = (
-                "Unable to import boot images, no image "
-                "descriptions avaliable."
-            )
+            msg = "Unable to import boot images, no image descriptions available."
             Event.objects.create_region_event(
                 EVENT_TYPES.REGION_IMPORT_WARNING, msg
             )
