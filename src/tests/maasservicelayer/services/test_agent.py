@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from maasservicelayer.context import Context
+from maasservicelayer.db.repositories.agents import AgentsRepository
 from maasservicelayer.services import (
     AgentsService,
     ConfigurationsService,
@@ -19,6 +20,7 @@ class TestAgentsService:
     async def test_get_service_configuration(self) -> None:
         agents_service = AgentsService(
             context=Context(),
+            repository=Mock(AgentsRepository),
             configurations_service=Mock(ConfigurationsService),
             users_service=Mock(UsersService),
         )
@@ -41,6 +43,7 @@ class TestAgentsService:
 
         agents_service = AgentsService(
             context=Context(),
+            repository=Mock(AgentsRepository),
             configurations_service=configurations_service,
             users_service=users_service,
         )
@@ -58,6 +61,7 @@ class TestAgentsService:
         cache = AgentsServiceCache()
         agents_service = AgentsService(
             context=Context(),
+            repository=Mock(AgentsRepository),
             configurations_service=configurations_service,
             users_service=users_service,
             cache=cache,

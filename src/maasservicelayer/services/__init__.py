@@ -4,6 +4,7 @@
 from typing import Callable, Self
 
 from maasservicelayer.context import Context
+from maasservicelayer.db.repositories.agents import AgentsRepository
 from maasservicelayer.db.repositories.bootresourcefiles import (
     BootResourceFilesRepository,
 )
@@ -61,6 +62,7 @@ from maasservicelayer.db.repositories.notifications import (
 from maasservicelayer.db.repositories.package_repositories import (
     PackageRepositoriesRepository,
 )
+from maasservicelayer.db.repositories.racks import RacksRepository
 from maasservicelayer.db.repositories.rdns import RDNSRepository
 from maasservicelayer.db.repositories.reservedips import ReservedIPsRepository
 from maasservicelayer.db.repositories.resource_pools import (
@@ -146,6 +148,7 @@ from maasservicelayer.services.notifications import NotificationsService
 from maasservicelayer.services.package_repositories import (
     PackageRepositoriesService,
 )
+from maasservicelayer.services.racks import RacksService
 from maasservicelayer.services.rdns import RDNSService
 from maasservicelayer.services.reservedips import ReservedIPsService
 from maasservicelayer.services.resource_pools import ResourcePoolsService
@@ -237,6 +240,7 @@ class ServiceCollectionV3:
     nodes: NodesService
     notifications: NotificationsService
     package_repositories: PackageRepositoriesService
+    racks: RacksService
     rdns: RDNSService
     reservedips: ReservedIPsService
     resource_pools: ResourcePoolsService
@@ -571,6 +575,7 @@ class ServiceCollectionV3:
         )
         services.agents = AgentsService(
             context=context,
+            repository=AgentsRepository(context),
             configurations_service=services.configurations,
             users_service=services.users,
             cache=cache.get(
@@ -592,6 +597,9 @@ class ServiceCollectionV3:
         )
         services.mdns = MDNSService(
             context=context, mdns_repository=MDNSRepository(context)
+        )
+        services.racks = RacksService(
+            context=context, repository=RacksRepository(context)
         )
         services.rdns = RDNSService(
             context=context, rdns_repository=RDNSRepository(context)

@@ -4,14 +4,10 @@
 import datetime
 from typing import Optional
 
-from maasservicelayer.models.base import (
-    generate_builder,
-    MaasTimestampedBaseModel,
-)
+from maasservicelayer.models.base import MaasBaseModel
 
 
-@generate_builder()
-class AgentCertificate(MaasTimestampedBaseModel):
+class AgentCertificate(MaasBaseModel):
     certificate_fingerprint: str
     certificate: bytes
     revoked_at: Optional[datetime.datetime]

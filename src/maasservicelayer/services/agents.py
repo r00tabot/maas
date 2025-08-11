@@ -3,9 +3,12 @@
 from dataclasses import dataclass
 
 from maasservicelayer.apiclient.client import APIClient
+from maasservicelayer.builders.agents import AgentBuilder
 from maasservicelayer.context import Context
+from maasservicelayer.db.repositories.agents import AgentsRepository
+from maasservicelayer.models.agents import Agent
 from maasservicelayer.models.configurations import MAASUrlConfig
-from maasservicelayer.services.base import Service, ServiceCache
+from maasservicelayer.services.base import BaseService, Service, ServiceCache
 from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.users import UsersService
 
@@ -19,15 +22,16 @@ class AgentsServiceCache(ServiceCache):
             await self.api_client.close()
 
 
-class AgentsService(Service):
+class AgentsService(BaseService[Agent, AgentsRepository, AgentBuilder]):
     def __init__(
         self,
         context: Context,
+        repository: AgentsRepository,
         configurations_service: ConfigurationsService,
         users_service: UsersService,
         cache: AgentsServiceCache | None = None,
     ):
-        super().__init__(context, cache)
+        super().__init__(context, repository, cache)
         self._apiclient = None
         self.configurations_service = configurations_service
         self.users_service = users_service
