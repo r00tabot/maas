@@ -2,26 +2,35 @@
 #  GNU Affero General Public License version 3 (see the file LICENSE).
 
 import asyncio
-from asyncio import gather
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import shutil
-from typing import Coroutine
+from typing import Any, Coroutine
 
 from aiohttp.client_exceptions import ClientError
-from sqlalchemy.ext.asyncio import AsyncConnection
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy, WorkflowIDReusePolicy
-from temporalio.exceptions import ApplicationError
-from temporalio.workflow import ActivityCancellationType, random
+from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
+from temporalio.workflow import (
+    ActivityCancellationType,
+    ChildWorkflowHandle,
+    ParentClosePolicy,
+    random,
+)
 
 from maascommon.workflows.bootresource import (
+    CancelObsoleteDownloadWorkflowsParam,
     CHECK_BOOTRESOURCES_STORAGE_WORKFLOW_NAME,
+    CLEANUP_TIMEOUT,
+    CleanupOldBootResourceParam,
     DELETE_BOOTRESOURCE_WORKFLOW_NAME,
     DISK_TIMEOUT,
     DOWNLOAD_BOOTRESOURCE_WORKFLOW_NAME,
     DOWNLOAD_TIMEOUT,
+    FETCH_IMAGE_METADATA_TIMEOUT,
+    GetFilesToDownloadReturnValue,
     HEARTBEAT_TIMEOUT,
+    MASTER_IMAGE_SYNC_WORKFLOW_NAME,
     MAX_SOURCES,
     REPORT_INTERVAL,
     ResourceDeleteParam,
@@ -31,9 +40,7 @@ from maascommon.workflows.bootresource import (
     SyncRequestParam,
 )
 from maasserver.utils.converters import human_readable_bytes
-from maasservicelayer.db import Database
 from maasservicelayer.models.configurations import MAASUrlConfig
-from maasservicelayer.services import CacheForServices
 from maasservicelayer.utils.image_local_files import (
     get_bootresource_store_path,
     LocalBootResourceFile,
@@ -50,27 +57,19 @@ from maastemporalworker.workflow.utils import (
 from provisioningserver.utils.url import compose_URL
 
 CHECK_DISK_SPACE_ACTIVITY_NAME = "check-disk-space"
-GET_BOOTRESOURCEFILE_SYNC_STATUS_ACTIVITY_NAME = (
-    "get-bootresourcefile-sync-status"
-)
 GET_BOOTRESOURCEFILE_ENDPOINTS_ACTIVITY_NAME = "get-bootresourcefile-endpoints"
 DOWNLOAD_BOOTRESOURCEFILE_ACTIVITY_NAME = "download-bootresourcefile"
 DELETE_BOOTRESOURCEFILE_ACTIVITY_NAME = "delete-bootresourcefile"
-
-
-class BootResourceImportCancelled(Exception):
-    """Operation was cancelled"""
+GET_FILES_TO_DOWNLOAD_ACTIVITY_NAME = "get-files-to-download"
+CLEANUP_OLD_BOOT_RESOURCES_ACTIVITY_NAME = "cleanup-old-boot-resources"
+CANCEL_OBSOLETE_DOWNLOAD_WORKFLOWS_ACTIVITY_NAME = (
+    "cancel-obsolete-download-workflows"
+)
+GET_SYNCED_REGIONS_ACTIVITY_NAME = "get-synced-regions"
+SET_GLOBAL_DEFAULT_RELEASES_ACTIVITY_NAME = "set-global-default-releases"
 
 
 class BootResourcesActivity(ActivityBase):
-    def __init__(
-        self,
-        db: Database,
-        services_cache: CacheForServices,
-        connection: AsyncConnection | None = None,
-    ):
-        super().__init__(db, services_cache, connection)
-
     async def init(self, region_id: str):
         self.region_id = region_id
         async with self.start_transaction() as services:
@@ -120,16 +119,14 @@ class BootResourcesActivity(ActivityBase):
             )
             return False
 
-    @activity_defn_with_context(
-        name=GET_BOOTRESOURCEFILE_SYNC_STATUS_ACTIVITY_NAME
-    )
-    async def get_bootresourcefile_sync_status(
-        self, with_sources: bool = True
-    ) -> dict:
-        url = f"{self.apiclient.url}/api/2.0/images-sync-progress/"
-        return await self.apiclient.request_async(
-            "GET", url, params={"sources": str(with_sources)}
-        )
+    @activity_defn_with_context(name=GET_SYNCED_REGIONS_ACTIVITY_NAME)
+    async def get_synced_regions_for_files(
+        self, file_ids: set[int]
+    ) -> list[str]:
+        async with self.start_transaction() as services:
+            return await services.boot_resource_file_sync.get_synced_regions(
+                file_ids
+            )
 
     @activity_defn_with_context(
         name=GET_BOOTRESOURCEFILE_ENDPOINTS_ACTIVITY_NAME
@@ -162,7 +159,6 @@ class BootResourcesActivity(ActivityBase):
         Returns:
             bool: True if the file was successfully downloaded
         """
-
         lfile = LocalBootResourceFile(
             param.sha256, param.filename_on_disk, param.total_size, param.size
         )
@@ -174,7 +170,7 @@ class BootResourcesActivity(ActivityBase):
 
         try:
             while not lfile.acquire_lock(try_lock=True):
-                activity.heartbeat()
+                activity.heartbeat("Waiting for file lock")
                 await asyncio.sleep(5)
 
             if await lfile.avalid():
@@ -182,7 +178,7 @@ class BootResourcesActivity(ActivityBase):
                 lfile.commit()
                 for target in param.extract_paths:
                     lfile.extract_file(target)
-                    activity.heartbeat()
+                    activity.heartbeat(f"Extracted file in {target}")
                 await self.report_progress(param.rfile_ids, lfile.size)
                 return True
 
@@ -198,22 +194,22 @@ class BootResourcesActivity(ActivityBase):
                 response.raise_for_status()
                 last_update = datetime.now(timezone.utc)
                 async for data, _ in response.content.iter_chunks():
-                    activity.heartbeat()
+                    activity.heartbeat("Downloaded chunk")
+                    store.write(data)
                     dt_now = datetime.now(timezone.utc)
                     if dt_now > (last_update + REPORT_INTERVAL):
                         await self.report_progress(param.rfile_ids, lfile.size)
                         last_update = dt_now
-                    store.write(data)
 
             activity.logger.debug("Download done, doing checksum")
-            activity.heartbeat()
+            activity.heartbeat("Finished download, doing checksum")
             if await lfile.avalid():
                 lfile.commit()
                 activity.logger.debug(f"file commited {lfile.size}")
 
                 for target in param.extract_paths:
                     lfile.extract_file(target)
-                    activity.heartbeat()
+                    activity.heartbeat(f"Extracted file in {target}")
 
                 await self.report_progress(param.rfile_ids, lfile.size)
                 return True
@@ -256,7 +252,7 @@ class BootResourcesActivity(ActivityBase):
             )
             try:
                 while not lfile.acquire_lock(try_lock=True):
-                    activity.heartbeat()
+                    activity.heartbeat("Waiting for file lock")
                     await asyncio.sleep(5)
                 lfile.unlink()
             finally:
@@ -264,13 +260,94 @@ class BootResourcesActivity(ActivityBase):
             activity.logger.info(f"file {file} deleted")
         return True
 
+    @activity_defn_with_context(name=GET_FILES_TO_DOWNLOAD_ACTIVITY_NAME)
+    async def get_files_to_download(self) -> GetFilesToDownloadReturnValue:
+        resources_to_download: dict[str, ResourceDownloadParam] = {}
+        boot_resource_ids_to_keep: set[int] = set()
+        async with self.start_transaction() as services:
+            boot_source_products_mapping = (
+                await services.image_sync.fetch_images_metadata()
+            )
+            for (
+                boot_source,
+                products_list,
+            ) in boot_source_products_mapping.items():
+                await services.image_sync.cache_boot_source_from_simplestreams_products(
+                    boot_source.id, products_list
+                )
+
+            await services.image_sync.sync_boot_source_selections_from_msm(
+                list(boot_source_products_mapping.keys())
+            )
+
+            if not await services.image_sync.check_commissioning_series_selected():
+                raise ApplicationError(
+                    "Either the commissioning os or the commissioning series "
+                    "are not selected or are not available in the stream.",
+                    non_retryable=True,
+                )
+
+            boot_source_products_mapping = (
+                await services.image_sync.filter_products(
+                    boot_source_products_mapping
+                )
+            )
+            for (
+                boot_source,
+                products_list,
+            ) in boot_source_products_mapping.items():
+                (
+                    to_download,
+                    boot_resource_ids,
+                ) = await services.image_sync.get_files_to_download_from_product_list(
+                    boot_source, products_list
+                )
+                resources_to_download.update(to_download)
+                boot_resource_ids_to_keep |= boot_resource_ids
+
+        return GetFilesToDownloadReturnValue(
+            resources=list(resources_to_download.values()),
+            boot_resource_ids=boot_resource_ids_to_keep,
+        )
+
+    @activity_defn_with_context(name=SET_GLOBAL_DEFAULT_RELEASES_ACTIVITY_NAME)
+    async def set_global_default_releases(self) -> None:
+        async with self.start_transaction() as services:
+            await services.image_sync.set_global_default_releases()
+
+    @activity_defn_with_context(name=CLEANUP_OLD_BOOT_RESOURCES_ACTIVITY_NAME)
+    async def cleanup_old_boot_resources(
+        self, param: CleanupOldBootResourceParam
+    ) -> None:
+        async with self.start_transaction() as services:
+            await services.image_sync.delete_old_boot_resources(
+                param.boot_resource_ids_to_keep
+            )
+            await services.image_sync.delete_old_boot_resource_sets()
+
+    @activity_defn_with_context(
+        name=CANCEL_OBSOLETE_DOWNLOAD_WORKFLOWS_ACTIVITY_NAME
+    )
+    async def cancel_obsolete_download_workflows(
+        self, param: CancelObsoleteDownloadWorkflowsParam
+    ) -> None:
+        shas_to_download = {sha[:12] for sha in param.sha_to_download}
+        async for wf in self.temporal_client.list_workflows(
+            query=f"WorkflowType='{SYNC_BOOTRESOURCES_WORKFLOW_NAME}' AND ExecutionStatus='Running'"
+        ):
+            # Workflow ID is in the form: <wf-name>:<sha>
+            sha = wf.id.rsplit(":", maxsplit=1)[1]
+            if sha not in shas_to_download:
+                handle = self.temporal_client.get_workflow_handle(wf.id)
+                await handle.cancel()
+
 
 @workflow.defn(name=DOWNLOAD_BOOTRESOURCE_WORKFLOW_NAME, sandboxed=False)
 class DownloadBootResourceWorkflow:
     """Downloads a BootResourceFile to this controller"""
 
     @workflow_run_with_context
-    async def run(self, input: ResourceDownloadParam) -> None:
+    async def run(self, input: ResourceDownloadParam) -> bool:
         return await workflow.execute_activity(
             DOWNLOAD_BOOTRESOURCEFILE_ACTIVITY_NAME,
             input,
@@ -305,117 +382,89 @@ class SyncBootResourcesWorkflow:
 
     @workflow_run_with_context
     async def run(self, input: SyncRequestParam) -> None:
-        def _schedule_disk_check(
-            res: SpaceRequirementParam,
-            region: str,
-        ):
-            return workflow.execute_child_workflow(
-                CHECK_BOOTRESOURCES_STORAGE_WORKFLOW_NAME,
-                res,
-                id=f"check-bootresources-storage:{region}",
-                execution_timeout=DISK_TIMEOUT,
-                run_timeout=DISK_TIMEOUT,
-                id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
-                task_queue=f"region:{region}",
-            )
-
         def _schedule_download(
             res: ResourceDownloadParam,
             region: str | None = None,
-        ):
+        ) -> Coroutine[Any, Any, bool]:
             return workflow.execute_child_workflow(
                 DOWNLOAD_BOOTRESOURCE_WORKFLOW_NAME,
                 res,
                 id=f"download-bootresource:{region or 'upstream'}:{res.sha256[:12]}",
                 execution_timeout=DOWNLOAD_TIMEOUT,
                 run_timeout=DOWNLOAD_TIMEOUT,
-                id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
                 task_queue=f"region:{region}" if region else REGION_TASK_QUEUE,
             )
 
-        # get regions and endpoints
-        endpoints: dict[str, list] = await workflow.execute_activity(
-            GET_BOOTRESOURCEFILE_ENDPOINTS_ACTIVITY_NAME,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
-        regions: frozenset[str] = frozenset(endpoints.keys())
-
-        # check disk space
-        check_space_jobs = [
-            _schedule_disk_check(input.requirement, region)
-            for region in regions
-        ]
-        has_space: list[bool] = await gather(*check_space_jobs)
-        if not all(has_space):
+        # download resource from upstream
+        downloaded = await _schedule_download(input.resource)
+        if not downloaded:
             raise ApplicationError(
-                "some region controllers don't have enough disk space",
+                f"File {input.resource.sha256} could not be downloaded, aborting",
                 non_retryable=True,
             )
 
-        # download resources that must be fetched from upstream
-        upstream_jobs = [
-            _schedule_download(replace(res, http_proxy=input.http_proxy))
-            for res in input.resources
-            if res.source_list
-        ]
-        if upstream_jobs:
-            workflow.logger.info(
-                f"Syncing {len(upstream_jobs)} resources from upstream"
-            )
-            downloaded: list[bool] = await gather(*upstream_jobs)
-            if not all(downloaded):
-                raise ApplicationError(
-                    "some files could not be downloaded, aborting",
-                    non_retryable=True,
-                )
+        handle = workflow.get_external_workflow_handle_for(
+            MasterImageSyncWorkflow.run, "master-download-bootresource"
+        )
+
+        regions = frozenset(input.endpoints.keys())
 
         if len(regions) < 2:
-            workflow.logger.info("Sync complete")
+            workflow.logger.info(
+                f"Sync complete for file {input.resource.sha256}"
+            )
+            await handle.signal(
+                MasterImageSyncWorkflow.file_completed_download,
+                input.resource.sha256,
+            )
             return
 
-        # distribute files inside cluster
-        sync_status: dict[str, dict] = await workflow.execute_activity(
-            GET_BOOTRESOURCEFILE_SYNC_STATUS_ACTIVITY_NAME,
+        # sync the resource with the other regions
+        synced_regions: list[str] = await workflow.execute_activity(
+            GET_SYNCED_REGIONS_ACTIVITY_NAME,
+            arg={file_id for file_id in input.resource.rfile_ids},
             start_to_close_timeout=timedelta(seconds=30),
         )
+
+        if not synced_regions:
+            raise ApplicationError(
+                f"File {input.resource.sha256} has no complete copy available"
+            )
+
+        missing_regions = regions - set(synced_regions)
 
         # Use a random generator from the temporal sdk in order to keep the workflow deterministic.
         random_generator = random()
 
-        sync_jobs: list[Coroutine] = []
-        for res in input.resources:
-            missing: set[str] = set()
-            for id in res.rfile_ids:
-                missing.update(regions - set(sync_status[str(id)]["sources"]))
-            if missing == regions:
-                workflow.logger.error(
-                    f"File {res.sha256} has no complete copy available, skipping"
-                )
-                continue
-            sources = regions - missing
-            eps = [
-                f"{ep}{res.filename_on_disk}/"
-                for reg in sources
-                for ep in endpoints[reg]
-            ]
-            # In order to balance the workload on the regions we randomize the order of the source_list.
-            new_res = replace(
-                res,
-                source_list=random_generator.sample(
-                    eps, min(len(eps), MAX_SOURCES)
-                ),
-            )
-            for region in missing:
-                sync_jobs.append(_schedule_download(new_res, region))
+        eps = [
+            f"{endpoint}{input.resource.filename_on_disk}/"
+            for region in synced_regions
+            for endpoint in input.endpoints[region]
+        ]
+        # In order to balance the workload on the regions we randomize the order of the source_list.
+        new_res = replace(
+            input.resource,
+            source_list=random_generator.sample(
+                eps, min(len(eps), MAX_SOURCES)
+            ),
+        )
+        sync_jobs = [
+            _schedule_download(new_res, region) for region in missing_regions
+        ]
+
         if sync_jobs:
-            synced: list[bool] = await gather(*sync_jobs)
+            synced = await asyncio.gather(*sync_jobs)
             if not all(synced):
                 raise ApplicationError(
-                    "some files could not be synced, aborting",
+                    f"File {input.resource.sha256} could not be synced, aborting",
                     non_retryable=True,
                 )
 
-        workflow.logger.info("Sync complete")
+        await handle.signal(
+            MasterImageSyncWorkflow.file_completed_download,
+            input.resource.sha256,
+        )
+        workflow.logger.info(f"Sync complete for file {input.resource.sha256}")
 
 
 @workflow.defn(name=DELETE_BOOTRESOURCE_WORKFLOW_NAME, sandboxed=False)
@@ -439,3 +488,131 @@ class DeleteBootResourceWorkflow:
                 schedule_to_close_timeout=DISK_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=3),
             )
+
+
+@workflow.defn(name=MASTER_IMAGE_SYNC_WORKFLOW_NAME, sandboxed=False)
+class MasterImageSyncWorkflow:
+    def __init__(self) -> None:
+        # list of sha256 that must be downloaded
+        self._files_to_download: set[str] = set()
+
+    def _schedule_disk_check(
+        self,
+        res: SpaceRequirementParam,
+        region: str,
+    ):
+        return workflow.execute_child_workflow(
+            CHECK_BOOTRESOURCES_STORAGE_WORKFLOW_NAME,
+            res,
+            id=f"check-bootresources-storage:{region}",
+            execution_timeout=DISK_TIMEOUT,
+            run_timeout=DISK_TIMEOUT,
+            id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+            task_queue=f"region:{region}",
+        )
+
+    def _download_and_sync_resource(
+        self,
+        input: SyncRequestParam,
+    ) -> Coroutine[Any, Any, ChildWorkflowHandle]:
+        wf_id = f"sync-bootresource:{input.resource.sha256[:12]}"
+        try:
+            return workflow.start_child_workflow(
+                SYNC_BOOTRESOURCES_WORKFLOW_NAME,
+                input,
+                id=wf_id,
+                execution_timeout=DOWNLOAD_TIMEOUT,
+                run_timeout=DOWNLOAD_TIMEOUT,
+                parent_close_policy=ParentClosePolicy.ABANDON,
+                task_queue=REGION_TASK_QUEUE,
+            )
+        except WorkflowAlreadyStartedError:
+            workflow.logger.debug(
+                f"Sync workflow with id {wf_id} already running. Skipping."
+            )
+
+    @workflow_run_with_context
+    async def run(self) -> None:
+        result = await workflow.execute_activity(
+            GET_FILES_TO_DOWNLOAD_ACTIVITY_NAME,
+            start_to_close_timeout=FETCH_IMAGE_METADATA_TIMEOUT,
+        )
+
+        resources_to_download = [
+            ResourceDownloadParam(**res) for res in result["resources"]
+        ]
+        boot_resource_ids_to_keep = result["boot_resource_ids"]
+
+        required_disk_space_for_files = sum(
+            [r.total_size for r in resources_to_download],
+            start=100 * 2**20,  # space to uncompress the bootloaders
+        )
+        # get regions and endpoints
+        endpoints = await workflow.execute_activity(
+            GET_BOOTRESOURCEFILE_ENDPOINTS_ACTIVITY_NAME,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        regions: frozenset[str] = frozenset(endpoints.keys())
+
+        self._files_to_download = set(
+            res.sha256 for res in resources_to_download
+        )
+
+        # check disk space
+        check_space_jobs = [
+            self._schedule_disk_check(
+                SpaceRequirementParam(
+                    total_resources_size=required_disk_space_for_files
+                ),
+                region,
+            )
+            for region in regions
+        ]
+        has_space: list[bool] = await asyncio.gather(*check_space_jobs)
+        if not all(has_space):
+            raise ApplicationError(
+                "some region controllers don't have enough disk space",
+                non_retryable=True,
+            )
+
+        # cancel obsolete download workflows that are running
+        await workflow.execute_activity(
+            CANCEL_OBSOLETE_DOWNLOAD_WORKFLOWS_ACTIVITY_NAME,
+            arg=CancelObsoleteDownloadWorkflowsParam(self._files_to_download),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+        sync_jobs = [
+            self._download_and_sync_resource(
+                SyncRequestParam(resource=res, endpoints=endpoints)
+            )
+            for res in resources_to_download
+        ]
+
+        if sync_jobs:
+            workflow.logger.info(
+                f"Syncing {len(sync_jobs)} resources from upstream"
+            )
+            await asyncio.gather(*sync_jobs)
+
+        await workflow.wait_condition(lambda: self._files_to_download == set())
+
+        await workflow.execute_activity(
+            SET_GLOBAL_DEFAULT_RELEASES_ACTIVITY_NAME,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        await workflow.execute_activity(
+            CLEANUP_OLD_BOOT_RESOURCES_ACTIVITY_NAME,
+            arg=CleanupOldBootResourceParam(boot_resource_ids_to_keep),
+            start_to_close_timeout=CLEANUP_TIMEOUT,
+        )
+
+    @workflow.signal
+    async def file_completed_download(self, sha256: str) -> None:
+        """Signal handler for when a sync workflow has been completed."""
+        try:
+            self._files_to_download.remove(sha256)
+        except KeyError:
+            # KeyError can happen if the signal is sent when the MasterWorkflow has
+            # been restarted but it hasn't populated the files yet.
+            pass

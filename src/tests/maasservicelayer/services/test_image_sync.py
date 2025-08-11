@@ -732,7 +732,7 @@ class TestImageSyncService:
         )
         self.boot_resource_files_service.get_or_create_from_simplestreams_file.side_effect = resource_files
         # mark all the files as not complete
-        self.boot_resource_file_sync_service.file_sync_complete.return_value = False
+        self.boot_resource_file_sync_service.sync_complete.return_value = False
         (
             res_to_download,
             boot_res_id,
@@ -825,7 +825,7 @@ class TestImageSyncService:
         )
         self.boot_resource_files_service.get_or_create_from_simplestreams_file.side_effect = resource_files
         # mark all the files as not complete
-        self.boot_resource_file_sync_service.file_sync_complete.return_value = False
+        self.boot_resource_file_sync_service.sync_complete.return_value = False
         (
             res_to_download,
             boot_res_id,
@@ -1040,7 +1040,7 @@ class TestImageSyncService:
         set2 = BOOT_RESOURCE_ORACULAR.copy()
         set2.id = 2
         self.boot_resource_sets_service.get_many.return_value = [set2, set1]
-        self.boot_resource_file_sync_service.resource_set_sync_complete.side_effect = [
+        self.boot_resource_file_sync_service.sync_complete.side_effect = [
             True,
             False,
         ]
