@@ -984,7 +984,7 @@ class CommissioningOSystemConfig(Config[Optional[str]]):
 
 
 class EnableHttpProxyConfig(Config[Optional[bool]]):
-    is_public: ClassVar[bool] = False
+    is_public: ClassVar[bool] = True
     name: ClassVar[str] = "enable_http_proxy"
     default: ClassVar[Optional[bool]] = True
     description: ClassVar[str] = (
@@ -997,7 +997,7 @@ class EnableHttpProxyConfig(Config[Optional[bool]]):
 
 
 class HttpProxyConfig(Config[Optional[AnyHttpUrl]]):
-    is_public: ClassVar[bool] = False
+    is_public: ClassVar[bool] = True
     name: ClassVar[str] = "http_proxy"
     default: ClassVar[Optional[AnyHttpUrl]] = None
     description: ClassVar[str] = "Proxy for APT or YUM and HTTP/HTTPS"
