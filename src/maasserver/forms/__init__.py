@@ -162,6 +162,7 @@ from maasserver.models.tag import Tag
 from maasserver.models.virtualblockdevice import VirtualBlockDevice
 from maasserver.models.zone import Zone
 from maasserver.permissions import NodePermission, ResourcePoolPermission
+from maasserver.sqlalchemy import service_layer
 from maasserver.storage_layouts import VMFS6StorageLayout, VMFS7StorageLayout
 from maasserver.utils.certificates import generate_certificate
 from maasserver.utils.converters import machine_readable_bytes
@@ -505,7 +506,7 @@ def list_all_usable_architectures():
     all clusters sync from the region, all cluster support the same
     architectures.
     """
-    return sorted(BootResource.objects.get_usable_architectures())
+    return service_layer.services.boot_resources.get_usable_architectures()
 
 
 def list_architecture_choices(architectures):

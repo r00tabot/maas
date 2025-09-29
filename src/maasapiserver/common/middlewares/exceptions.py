@@ -119,7 +119,7 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
             return ValidationErrorResponse(e.details)
         except NotFoundException as e:
             logger.debug(e)
-            return NotFoundResponse()
+            return NotFoundResponse(e.details)
         except PreconditionFailedException as e:
             logger.debug(e)
             return PreconditionFailedResponse(e.details)
