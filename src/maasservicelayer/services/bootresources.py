@@ -1,5 +1,8 @@
 # Copyright 2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.bootresources import BootResourceBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
@@ -15,6 +18,8 @@ from maasservicelayer.services.base import BaseService, ServiceCache
 from maasservicelayer.services.bootresourcesets import BootResourceSetsService
 from maasservicelayer.simplestreams.models import Product
 from maasservicelayer.utils.date import utcnow
+
+logger = structlog.getLogger()
 
 
 class BootResourceService(
@@ -50,6 +55,36 @@ class BootResourceService(
                     [r.id for r in resources]
                 )
             )
+        )
+
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootresource:created:{resource.id}", type=SECURITY
+        )
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootresource:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootresources:updated:{resource_ids}",
+            type=SECURITY,
+        )
+
+    async def post_delete_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootresource:deleted:{resource.id}", type=SECURITY
+        )
+
+    async def post_delete_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootresources:deleted:{resource_ids}",
+            type=SECURITY,
         )
 
     async def create_or_update_from_simplestreams_product(

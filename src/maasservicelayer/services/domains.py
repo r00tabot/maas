@@ -6,6 +6,7 @@ import re
 from typing import List
 
 from netaddr import IPAddress
+import structlog
 
 from maascommon.dns import (
     DomainDNSRecord,
@@ -13,6 +14,7 @@ from maascommon.dns import (
     HostnameRRsetMapping,
 )
 from maascommon.enums.dns import DnsUpdateAction
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.domains import DomainBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.domains import DomainsRepository
@@ -41,6 +43,8 @@ from maasservicelayer.services.users import UsersService
 # Labels are at most 63 octets long, and a name can be many of them
 LABEL = r"[a-zA-Z0-9]([-a-zA-Z0-9]{0,62}[a-zA-Z0-9]){0,1}"
 NAMESPEC = rf"({LABEL}[.])*{LABEL}[.]?"
+
+logger = structlog.getLogger()
 
 
 class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
@@ -92,6 +96,10 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
                 action=DnsUpdateAction.RELOAD,
             )
 
+        logger.info(
+            f"{AUTHZ_ADMIN}:domain:created:{resource.id}", type=SECURITY
+        )
+
     async def post_update_hook(
         self, old_resource: Domain, updated_resource: Domain
     ) -> None:
@@ -114,6 +122,10 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
                 source=source,
                 action=DnsUpdateAction.RELOAD,
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:domain:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
 
     async def post_update_many_hook(self, resources: List[Domain]) -> None:
         raise NotImplementedError("Not implemented yet.")
@@ -136,6 +148,9 @@ class DomainsService(BaseService[Domain, DomainsRepository, DomainBuilder]):
                 source=f"removed zone {resource.name}",
                 action=DnsUpdateAction.RELOAD,
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:domain:deleted:{resource.id}", type=SECURITY
+        )
 
     async def post_delete_many_hook(self, resources: List[Domain]) -> None:
         raise NotImplementedError("Not implemented yet.")

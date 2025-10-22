@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from maascommon.enums.events import EventTypeEnum
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.tag import (
     TAG_EVALUATION_WORKFLOW_NAME,
     TagEvaluationParam,
@@ -15,9 +16,11 @@ from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.tags import TagsRepository
 from maasservicelayer.exceptions.catalog import ValidationException
 from maasservicelayer.models.tags import Tag
+from maasservicelayer.services import tags as tags_module
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.tags import TagsService
 from maasservicelayer.services.temporal import TemporalService
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 AUTOMATIC_TAG = Tag(
@@ -37,7 +40,9 @@ MANUAL_TAG = Tag(
 )
 
 
-class TestTagsServiceCommon(ServiceCommonTests):
+class TestTagsServiceCommon(ServiceCommonTests, MockLoggerMixin):
+    module = tags_module
+
     @pytest.fixture
     def service_instance(self) -> TagsService:
         return TagsService(
@@ -66,6 +71,42 @@ class TestTagsServiceCommon(ServiceCommonTests):
     async def test_delete_many(self, service_instance, test_instance):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self,
+        service_instance: TagsService,
+        test_instance: Tag,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:tag:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: TagsService,
+        test_instance: Tag,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:tag:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: TagsService,
+        test_instance: Tag,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:tag:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

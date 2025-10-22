@@ -8,6 +8,7 @@ import pytest
 
 from maascommon.enums.dns import DnsUpdateAction
 from maascommon.enums.subnet import RdnsMode
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     merge_configure_dhcp_param,
@@ -39,6 +40,7 @@ from maasservicelayer.exceptions.catalog import (
 from maasservicelayer.models.base import MaasBaseModel, ResourceBuilder
 from maasservicelayer.models.subnets import Subnet
 from maasservicelayer.services import ServiceCollectionV3
+from maasservicelayer.services import subnets as subnets_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.dhcpsnippets import DhcpSnippetsService
 from maasservicelayer.services.dnspublications import DNSPublicationsService
@@ -53,6 +55,7 @@ from maasservicelayer.services.subnets import SubnetsService
 from maasservicelayer.services.temporal import TemporalService
 from maasservicelayer.utils.date import utcnow
 from maastemporalworker.workflow.dhcp import ConfigureDHCPParam
+from tests.fixtures import MockLoggerMixin
 from tests.fixtures.factories.fabric import create_test_fabric_entry
 from tests.fixtures.factories.subnet import create_test_subnet_entry
 from tests.fixtures.factories.vlan import create_test_vlan_entry
@@ -147,7 +150,9 @@ class TestIntegrationSubnetsService:
 
 
 @pytest.mark.asyncio
-class TestCommonSubnetsService(ServiceCommonTests):
+class TestCommonSubnetsService(ServiceCommonTests, MockLoggerMixin):
+    module = subnets_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return SubnetsService(
@@ -203,6 +208,42 @@ class TestCommonSubnetsService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:subnet:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:subnet:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:subnet:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

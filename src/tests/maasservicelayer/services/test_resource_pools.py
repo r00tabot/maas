@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.resource_pools import (
     ResourcePoolRepository,
@@ -12,14 +13,18 @@ from maasservicelayer.db.repositories.resource_pools import (
 from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.resource_pools import ResourcePool
+from maasservicelayer.services import resource_pools as resource_pools_module
 from maasservicelayer.services import ResourcePoolsService
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestCommonResourcePoolsService(ServiceCommonTests):
+class TestCommonResourcePoolsService(ServiceCommonTests, MockLoggerMixin):
+    module = resource_pools_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return ResourcePoolsService(
@@ -35,6 +40,66 @@ class TestCommonResourcePoolsService(ServiceCommonTests):
             description="",
             created=utcnow(),
             updated=utcnow(),
+        )
+
+    async def test_post_create_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:resourcepool:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:resourcepool:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:resourcepools:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:resourcepool:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_many_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:resourcepools:deleted:{[test_instance.id]}",
+            type=SECURITY,
         )
 
 

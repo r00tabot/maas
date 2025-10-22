@@ -3,8 +3,11 @@
 
 from typing import List, Optional
 
+import structlog
+
 from maascommon.enums.dns import DnsUpdateAction
 from maascommon.enums.ipaddress import IpAddressType
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.utils.network import coerce_to_valid_hostname
 from maasservicelayer.builders.dnsresources import DNSResourceBuilder
 from maasservicelayer.context import Context
@@ -23,6 +26,8 @@ from maasservicelayer.services.dnspublications import DNSPublicationsService
 from maasservicelayer.services.domains import DomainsService
 
 DEFAULT_DNSRESOURCE_TTL = 30
+
+logger = structlog.getLogger()
 
 
 class NoDNSResourceException(Exception):
@@ -61,6 +66,9 @@ class DNSResourcesService(
             label=resource.name,
             rtype="A",
             zone=domain.name,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:dnsresource:created:{resource.id}", type=SECURITY
         )
 
         return
@@ -107,6 +115,10 @@ class DNSResourcesService(
                 zone=domain.name,
                 ttl=self._get_ttl(updated_resource, domain),
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:dnsresource:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
 
         return
 
@@ -129,6 +141,9 @@ class DNSResourcesService(
             label=resource.name,
             rtype="A",
             zone=domain.name,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:dnsresource:deleted:{resource.id}", type=SECURITY
         )
         return
 

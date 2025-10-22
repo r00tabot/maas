@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.configurations import (
     DatabaseConfigurationBuilder,
 )
@@ -22,6 +23,7 @@ from maasservicelayer.models.configurations import (
     VCenterPasswordConfig,
 )
 from maasservicelayer.models.secrets import VCenterPasswordSecret
+from maasservicelayer.services import configurations as configurations_module
 from maasservicelayer.services import (
     ConfigurationsService,
     EventsService,
@@ -33,6 +35,7 @@ from maasservicelayer.services.database_configurations import (
     DatabaseConfigurationsService,
 )
 from maasservicelayer.services.secrets import SecretNotFound
+from tests.fixtures import MockLoggerMixin
 from tests.fixtures.factories.configuration import create_test_configuration
 from tests.maasapiserver.fixtures.db import Fixture
 
@@ -169,7 +172,9 @@ class TestIntegrationConfigurationsService:
 
 
 @pytest.mark.asyncio
-class TestConfigurationsService:
+class TestConfigurationsService(MockLoggerMixin):
+    module = configurations_module
+
     async def test_get_from_database(self):
         service = ConfigurationsService(
             context=Context(),
@@ -333,7 +338,7 @@ class TestConfigurationsService:
             DatabaseConfigurationBuilder(name="foo", value="bar")
         )
 
-    async def test_set_database_setting(self):
+    async def test_set_database_setting(self, mock_logger):
         service = ConfigurationsService(
             context=Context(),
             database_configurations_service=Mock(
@@ -345,6 +350,10 @@ class TestConfigurationsService:
         await service.set(name=MAASNameConfig.name, value="bar")
         service.database_configurations_service.create_or_update.assert_called_once_with(
             DatabaseConfigurationBuilder(name=MAASNameConfig.name, value="bar")
+        )
+        mock_logger.info.assert_called_once_with(
+            f"{AUTHZ_ADMIN}:configuration:set:{MAASNameConfig.name}",
+            type=SECURITY,
         )
 
     async def test_set_secret_setting(self):

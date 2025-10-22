@@ -4,7 +4,9 @@
 from typing import List
 
 from pydantic import IPvAnyAddress
+import structlog
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -31,6 +33,8 @@ from maasservicelayer.models.ipranges import IPRange
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.dhcpsnippets import DhcpSnippetsService
 from maasservicelayer.services.temporal import TemporalService
+
+logger = structlog.getLogger()
 
 
 class IPRangesService(
@@ -84,6 +88,10 @@ class IPRangesService(
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:iprange:created:{resource.id}",
+            type=SECURITY,
+        )
         return
 
     async def post_update_hook(
@@ -94,6 +102,10 @@ class IPRangesService(
             ConfigureDHCPParam(ip_range_ids=[updated_resource.id]),
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:iprange:updated:{updated_resource.id}",
+            type=SECURITY,
         )
         return
 
@@ -111,6 +123,10 @@ class IPRangesService(
             ConfigureDHCPParam(subnet_ids=[resource.subnet_id]),
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:iprange:deleted:{resource.id}",
+            type=SECURITY,
         )
 
     async def post_delete_many_hook(self, resources: List[IPRange]) -> None:

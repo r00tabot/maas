@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from maascommon.enums.ipaddress import IpAddressType
 from maascommon.enums.ipranges import IPRangeType
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     merge_configure_dhcp_param,
@@ -28,17 +29,21 @@ from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.ipranges import IPRange
 from maasservicelayer.models.staticipaddress import StaticIPAddress
 from maasservicelayer.models.subnets import Subnet
+from maasservicelayer.services import ipranges as ipranges_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.dhcpsnippets import DhcpSnippetsService
 from maasservicelayer.services.ipranges import IPRangesService
 from maasservicelayer.services.temporal import TemporalService
 from maasservicelayer.utils.date import utcnow
 from maastemporalworker.workflow.dhcp import ConfigureDHCPParam
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestCommonIPRangesService(ServiceCommonTests):
+class TestCommonIPRangesService(ServiceCommonTests, MockLoggerMixin):
+    module = ipranges_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return IPRangesService(
@@ -80,6 +85,33 @@ class TestCommonIPRangesService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:iprange:created:{test_instance.id}",  # noqa: F821
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:iprange:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:iprange:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

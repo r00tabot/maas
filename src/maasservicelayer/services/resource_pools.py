@@ -1,6 +1,9 @@
 #  Copyright 2024-2025 Canonical Ltd.  This software is licensed under the
 #  GNU Affero General Public License version 3 (see the file LICENSE).
 
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.resource_pools import ResourcePoolBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
@@ -20,6 +23,8 @@ from maasservicelayer.models.resource_pools import (
     ResourcePoolWithSummary,
 )
 from maasservicelayer.services.base import BaseService
+
+logger = structlog.getLogger()
 
 
 class ResourcePoolsService(
@@ -55,3 +60,35 @@ class ResourcePoolsService(
                     )
                 ]
             )
+
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:resourcepool:created:{resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:resourcepool:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:resourcepools:updated:{resource_ids}",
+            type=SECURITY,
+        )
+
+    async def post_delete_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:resourcepool:deleted:{resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_delete_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:resourcepools:deleted:{resource_ids}",
+            type=SECURITY,
+        )

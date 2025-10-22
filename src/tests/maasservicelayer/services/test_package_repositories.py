@@ -10,6 +10,7 @@ from maascommon.enums.package_repositories import (
     PACKAGE_REPO_MAIN_ARCHES,
     PACKAGE_REPO_PORTS_ARCHES,
 )
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
@@ -20,11 +21,15 @@ from maasservicelayer.db.repositories.package_repositories import (
 from maasservicelayer.exceptions.catalog import BadRequestException
 from maasservicelayer.models.fields import PackageRepoUrl
 from maasservicelayer.models.package_repositories import PackageRepository
+from maasservicelayer.services import (
+    package_repositories as package_repositories_module,
+)
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.package_repositories import (
     PackageRepositoriesService,
 )
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 MAIN_PACKAGE_REPO = PackageRepository(
@@ -80,7 +85,11 @@ TEST_PACKAGE_REPO = PackageRepository(
 
 
 @pytest.mark.asyncio
-class TestCommonPackageRepositoriesService(ServiceCommonTests):
+class TestCommonPackageRepositoriesService(
+    ServiceCommonTests, MockLoggerMixin
+):
+    module = package_repositories_module
+
     @pytest.fixture
     def service_instance(self) -> PackageRepositoriesService:
         return PackageRepositoriesService(
@@ -100,6 +109,42 @@ class TestCommonPackageRepositoriesService(ServiceCommonTests):
     async def test_update_many(self, service_instance, test_instance):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self,
+        service_instance: PackageRepositoriesService,
+        test_instance: PackageRepository,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:packagerepository:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: PackageRepositoriesService,
+        test_instance: PackageRepository,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:packagerepository:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: PackageRepositoriesService,
+        test_instance: PackageRepository,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:packagerepository:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 class TestPackageRepositoriesService:

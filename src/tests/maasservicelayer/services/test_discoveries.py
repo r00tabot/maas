@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.discoveries import DiscoveriesRepository
@@ -15,10 +16,12 @@ from maasservicelayer.db.repositories.neighbours import NeighbourClauseFactory
 from maasservicelayer.db.repositories.rdns import RDNSClauseFactory
 from maasservicelayer.models.discoveries import Discovery
 from maasservicelayer.models.fields import MacAddress
+from maasservicelayer.services import discoveries as discoveries_module
 from maasservicelayer.services.discoveries import DiscoveriesService
 from maasservicelayer.services.mdns import MDNSService
 from maasservicelayer.services.neighbours import NeighboursService
 from maasservicelayer.services.rdns import RDNSService
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ReadOnlyServiceCommonTests
 
 
@@ -61,7 +64,9 @@ class TestDiscoveriesService(ReadOnlyServiceCommonTests):
         )
 
 
-class TestDiscoveriesClear:
+class TestDiscoveriesClear(MockLoggerMixin):
+    module = discoveries_module
+
     @pytest.fixture(autouse=True)
     def mdns_service_mock(self):
         return Mock(MDNSService)
@@ -95,6 +100,7 @@ class TestDiscoveriesClear:
         rdns_service_mock: Mock,
         neighbours_service_mock: Mock,
         discoveries_service: DiscoveriesService,
+        mock_logger: Mock,
     ):
         ip = IPv4Address("10.0.0.1")
         mac = MacAddress("aa:bb:cc:dd:ee:ff")
@@ -115,6 +121,10 @@ class TestDiscoveriesClear:
                 )
             )
         )
+        mock_logger.info.assert_called_once_with(
+            f"{AUTHZ_ADMIN}:discovery ip and mac cleared:{ip}:{mac}",
+            type=SECURITY,
+        )
 
     async def test_clear_mdns_and_rdns(
         self,
@@ -122,6 +132,7 @@ class TestDiscoveriesClear:
         rdns_service_mock: Mock,
         neighbours_service_mock: Mock,
         discoveries_service: DiscoveriesService,
+        mock_logger: Mock,
     ):
         await discoveries_service.clear_mdns_and_rdns_records()
         mdns_service_mock.delete_many.assert_called_once_with(
@@ -131,6 +142,10 @@ class TestDiscoveriesClear:
             query=QuerySpec()
         )
         neighbours_service_mock.delete_many.assert_not_called()
+        mock_logger.info.assert_called_once_with(
+            f"{AUTHZ_ADMIN}:discovery mdns and rdns records cleared",
+            type=SECURITY,
+        )
 
     async def test_clear_neighours(
         self,
@@ -138,6 +153,7 @@ class TestDiscoveriesClear:
         rdns_service_mock: Mock,
         neighbours_service_mock: Mock,
         discoveries_service: DiscoveriesService,
+        mock_logger: Mock,
     ):
         await discoveries_service.clear_neighbours()
         neighbours_service_mock.delete_many.assert_called_once_with(
@@ -145,6 +161,10 @@ class TestDiscoveriesClear:
         )
         mdns_service_mock.delete_many.assert_not_called()
         rdns_service_mock.delete_many.assert_not_called()
+        mock_logger.info.assert_called_once_with(
+            f"{AUTHZ_ADMIN}:discovery neighbors cleared",
+            type=SECURITY,
+        )
 
     async def test_clear_all(
         self,

@@ -3,7 +3,10 @@
 
 from typing import List
 
+import structlog
+
 from maascommon.enums.events import EventTypeEnum
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.package_repositories import (
     PackageRepositoryBuilder,
 )
@@ -22,6 +25,8 @@ from maasservicelayer.exceptions.constants import (
 from maasservicelayer.models.package_repositories import PackageRepository
 from maasservicelayer.services.base import BaseService, ServiceCache
 from maasservicelayer.services.events import EventsService
+
+logger = structlog.getLogger()
 
 
 class PackageRepositoriesService(
@@ -46,6 +51,10 @@ class PackageRepositoriesService(
             event_type=EventTypeEnum.SETTINGS,
             event_description=f"Created package repository {resource.name}",
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:packagerepository:created:{resource.id}",
+            type=SECURITY,
+        )
 
     async def post_update_hook(
         self,
@@ -67,6 +76,10 @@ class PackageRepositoriesService(
         await self.events_service.record_event(
             event_type=EventTypeEnum.SETTINGS,
             event_description=f"Updated package repository {updated_resource.name}",
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:packagerepository:updated:{updated_resource.id}",
+            type=SECURITY,
         )
 
     async def post_update_many_hook(
@@ -93,6 +106,10 @@ class PackageRepositoriesService(
         await self.events_service.record_event(
             event_type=EventTypeEnum.SETTINGS,
             event_description=f"Deleted package repository {resource.name}",
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:packagerepository:deleted:{resource.id}",
+            type=SECURITY,
         )
 
     async def post_delete_many_hook(

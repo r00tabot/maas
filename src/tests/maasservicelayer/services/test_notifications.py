@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from maascommon.enums.notifications import NotificationCategoryEnum
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.auth.jwt import UserRole
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.notifications import (
@@ -16,7 +17,9 @@ from maasservicelayer.exceptions.catalog import (
 )
 from maasservicelayer.models.auth import AuthenticatedUser
 from maasservicelayer.models.notifications import Notification
+from maasservicelayer.services import notifications as notifications_module
 from maasservicelayer.services.notifications import NotificationsService
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 TEST_NOTIFICATION = Notification(
@@ -33,7 +36,9 @@ TEST_NOTIFICATION = Notification(
 
 
 @pytest.mark.asyncio
-class TestCommonNotificationsService(ServiceCommonTests):
+class TestCommonNotificationsService(ServiceCommonTests, MockLoggerMixin):
+    module = notifications_module
+
     @pytest.fixture
     def service_instance(self) -> NotificationsService:
         return NotificationsService(
@@ -52,6 +57,66 @@ class TestCommonNotificationsService(ServiceCommonTests):
             user_id=None,
             category=NotificationCategoryEnum.WARNING,
             dismissable=True,
+        )
+
+    async def test_post_create_hook(
+        self,
+        service_instance: NotificationsService,
+        test_instance: Notification,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:notification:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: NotificationsService,
+        test_instance: Notification,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:notification:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: NotificationsService,
+        test_instance: Notification,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:notifications:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: NotificationsService,
+        test_instance: Notification,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:notification:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_many_hook(
+        self,
+        service_instance: NotificationsService,
+        test_instance: Notification,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:notifications:deleted:{[test_instance.id]}",
+            type=SECURITY,
         )
 
 

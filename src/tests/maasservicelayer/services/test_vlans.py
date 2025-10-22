@@ -7,6 +7,7 @@ import pytest
 
 from maascommon.enums.node import NodeStatus, NodeTypeEnum
 from maascommon.enums.power import PowerState
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     merge_configure_dhcp_param,
@@ -25,17 +26,21 @@ from maasservicelayer.exceptions.catalog import (
 from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.nodes import Node
 from maasservicelayer.models.vlans import Vlan
+from maasservicelayer.services import vlans as vlans_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.nodes import NodesService
 from maasservicelayer.services.temporal import TemporalService
 from maasservicelayer.services.vlans import VlansService
 from maasservicelayer.utils.date import utcnow
 from maastemporalworker.workflow.dhcp import ConfigureDHCPParam
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestCommonVlansService(ServiceCommonTests):
+class TestCommonVlansService(ServiceCommonTests, MockLoggerMixin):
+    module = vlans_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return VlansService(
@@ -73,6 +78,42 @@ class TestCommonVlansService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:vlan:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:vlan:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:vlan:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

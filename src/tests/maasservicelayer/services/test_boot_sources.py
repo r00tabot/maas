@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.bootsourcecache import (
@@ -15,6 +16,7 @@ from maasservicelayer.db.repositories.bootsourceselections import (
     BootSourceSelectionClauseFactory,
 )
 from maasservicelayer.models.bootsources import BootSource
+from maasservicelayer.services import boot_sources as boot_sources_module
 from maasservicelayer.services.boot_sources import BootSourcesService
 from maasservicelayer.services.bootsourcecache import BootSourceCacheService
 from maasservicelayer.services.bootsourceselections import (
@@ -23,11 +25,14 @@ from maasservicelayer.services.bootsourceselections import (
 from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestBootSourcesService(ServiceCommonTests):
+class TestBootSourcesService(ServiceCommonTests, MockLoggerMixin):
+    module = boot_sources_module
+
     @pytest.fixture
     def service_instance(self) -> BootSourcesService:
         return BootSourcesService(
@@ -92,4 +97,40 @@ class TestBootSourcesService(ServiceCommonTests):
                     boot_source.id
                 )
             )
+        )
+
+    async def test_post_create_hook(
+        self,
+        test_instance: BootSource,
+        service_instance: BootSourcesService,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootsource:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_updated_hook(
+        self,
+        test_instance: BootSource,
+        service_instance: BootSourcesService,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootsource:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        test_instance: BootSource,
+        service_instance: BootSourcesService,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootsource:deleted:{test_instance.id}",
+            type=SECURITY,
         )

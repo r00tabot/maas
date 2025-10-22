@@ -10,6 +10,7 @@ from maascommon.enums.boot_resources import (
     BootResourceFileType,
     BootResourceType,
 )
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.bootresources import BootResourceBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
@@ -22,11 +23,13 @@ from maasservicelayer.db.repositories.bootresourcesets import (
 )
 from maasservicelayer.models.bootresources import BootResource
 from maasservicelayer.models.bootresourcesets import BootResourceSet
+from maasservicelayer.services import bootresources as bootresources_module
 from maasservicelayer.services.bootresources import BootResourceService
 from maasservicelayer.services.bootresourcesets import BootResourceSetsService
 from maasservicelayer.simplestreams.models import BootloaderProduct
 from maasservicelayer.utils.date import utcnow
 from maastesting.factory import factory
+from tests.fixtures import MockLoggerMixin
 from tests.fixtures.factories.bootresourcefiles import (
     create_test_bootresourcefile_entry,
 )
@@ -52,7 +55,9 @@ TEST_BOOT_RESOURCE = BootResource(
 )
 
 
-class TestCommonBootResourceService(ServiceCommonTests):
+class TestCommonBootResourceService(ServiceCommonTests, MockLoggerMixin):
+    module = bootresources_module
+
     @pytest.fixture
     def service_instance(self) -> BootResourceService:
         return BootResourceService(
@@ -64,6 +69,66 @@ class TestCommonBootResourceService(ServiceCommonTests):
     @pytest.fixture
     def test_instance(self) -> BootResource:
         return TEST_BOOT_RESOURCE
+
+    async def test_post_create_hook(
+        self,
+        service_instance: BootResourceService,
+        test_instance: BootResource,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootresource:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: BootResourceService,
+        test_instance: BootResource,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootresource:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: BootResourceService,
+        test_instance: BootResource,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootresources:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: BootResourceService,
+        test_instance: BootResource,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootresource:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_many_hook(
+        self,
+        service_instance: BootResourceService,
+        test_instance: BootResource,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:bootresources:deleted:{[test_instance.id]}",
+            type=SECURITY,
+        )
 
 
 class TestBootResourceService:

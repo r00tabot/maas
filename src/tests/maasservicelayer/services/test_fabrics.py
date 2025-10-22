@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from maascommon.enums.interface import InterfaceType
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.fabrics import FabricBuilder
 from maasservicelayer.builders.vlans import VlanBuilder
 from maasservicelayer.context import Context
@@ -17,17 +18,21 @@ from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.fabrics import Fabric
 from maasservicelayer.models.interfaces import Interface
 from maasservicelayer.models.vlans import Vlan
+from maasservicelayer.services import fabrics as fabrics_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.fabrics import FabricsService
 from maasservicelayer.services.interfaces import InterfacesService
 from maasservicelayer.services.subnets import SubnetsService
 from maasservicelayer.services.vlans import VlansService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestCommonFabricsService(ServiceCommonTests):
+class TestCommonFabricsService(ServiceCommonTests, MockLoggerMixin):
+    module = fabrics_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return FabricsService(
@@ -78,6 +83,42 @@ class TestCommonFabricsService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:fabric:created:{test_instance.id}",  # noqa: F821
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:fabric:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:fabrics:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:fabric:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

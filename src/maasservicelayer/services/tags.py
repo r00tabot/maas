@@ -3,7 +3,10 @@
 
 from typing import override
 
+import structlog
+
 from maascommon.enums.events import EventTypeEnum
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.tag import (
     TAG_EVALUATION_WORKFLOW_NAME,
     TagEvaluationParam,
@@ -17,6 +20,8 @@ from maasservicelayer.models.tags import Tag
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.events import EventsService
 from maasservicelayer.services.temporal import TemporalService
+
+logger = structlog.getLogger()
 
 
 class TagsService(BaseService[Tag, TagsRepository, TagBuilder]):
@@ -46,6 +51,10 @@ class TagsService(BaseService[Tag, TagsRepository, TagBuilder]):
             event_type=EventTypeEnum.TAG,
             event_description=f"Tag '{resource.name}' created.",
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:tag:created:{resource.id}",
+            type=SECURITY,
+        )
 
     @override
     async def post_update_hook(
@@ -63,6 +72,10 @@ class TagsService(BaseService[Tag, TagsRepository, TagBuilder]):
             event_type=EventTypeEnum.TAG,
             event_description=f"Tag '{old_resource.name}' {action}.",
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:tag:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
 
     @override
     async def post_update_many_hook(self, resources: list[Tag]) -> None:
@@ -79,6 +92,10 @@ class TagsService(BaseService[Tag, TagsRepository, TagBuilder]):
         await self.events_service.record_event(
             event_type=EventTypeEnum.TAG,
             event_description=f"Tag '{resource.name}' deleted.",
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:tag:deleted:{resource.id}",
+            type=SECURITY,
         )
 
     @override

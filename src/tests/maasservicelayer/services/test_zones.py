@@ -7,6 +7,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from maasapiserver.v3.constants import DEFAULT_ZONE_NAME
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.zones import (
@@ -28,8 +29,10 @@ from maasservicelayer.services import (
     VmClustersService,
     ZonesService,
 )
+from maasservicelayer.services import zones as zones_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 DEFAULT_ZONE = Zone(
@@ -50,7 +53,9 @@ TEST_ZONE = Zone(
 
 
 @pytest.mark.asyncio
-class TestCommonZonesService(ServiceCommonTests):
+class TestCommonZonesService(ServiceCommonTests, MockLoggerMixin):
+    module = zones_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return ZonesService(
@@ -69,6 +74,54 @@ class TestCommonZonesService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:zone:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:zone:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:zones:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: BaseService,
+        test_instance: MaasBaseModel,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:zone:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

@@ -7,7 +7,9 @@ from typing import List
 from urllib.parse import urlparse
 
 import aiofiles
+import structlog
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.bootstraptokens import BootstrapTokenBuilder
 from maasservicelayer.builders.racks import RackBuilder
 from maasservicelayer.context import Context
@@ -33,6 +35,8 @@ from provisioningserver.certificates import (
 SECRET_TTL = timedelta(minutes=5)
 INTERNAL_API_PORT = 5242
 
+logger = structlog.getLogger()
+
 
 class RacksService(BaseService[Rack, RacksRepository, RackBuilder]):
     def __init__(
@@ -50,6 +54,25 @@ class RacksService(BaseService[Rack, RacksRepository, RackBuilder]):
         self.configurations_service = configurations_service
         self.secrets_service = secrets_service
 
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:rack:created:{resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:rack:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:racks:updated:{resource_ids}",
+            type=SECURITY,
+        )
+
     async def post_delete_hook(self, resource: Rack) -> None:
         # cascade delete for a single resource
         await self.bootstraptokens_service.delete_many(
@@ -61,6 +84,10 @@ class RacksService(BaseService[Rack, RacksRepository, RackBuilder]):
             query=QuerySpec(
                 where=AgentsClauseFactory.with_rack_id(resource.id)
             )
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:rack:deleted:{resource.id}",
+            type=SECURITY,
         )
 
     async def post_delete_many_hook(self, resources: List[Rack]) -> None:
@@ -76,6 +103,10 @@ class RacksService(BaseService[Rack, RacksRepository, RackBuilder]):
             query=QuerySpec(
                 where=AgentsClauseFactory.with_rack_id_in(rack_ids)
             )
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:racks:deleted:{rack_ids}",
+            type=SECURITY,
         )
 
     async def generate_bootstrap_token(self, resource: Rack) -> dict:

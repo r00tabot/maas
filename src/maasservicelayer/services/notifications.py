@@ -1,6 +1,9 @@
 # Copyright 2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.notifications import NotificationBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.notifications import (
@@ -19,6 +22,8 @@ from maasservicelayer.models.auth import AuthenticatedUser
 from maasservicelayer.models.base import ListResult
 from maasservicelayer.models.notifications import Notification
 from maasservicelayer.services.base import BaseService, ServiceCache
+
+logger = structlog.getLogger()
 
 
 class NotificationsService(
@@ -80,4 +85,36 @@ class NotificationsService(
         return await self.repository.create_notification_dismissal(
             notification_id=notification_id,
             user_id=user.id,
+        )
+
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:notification:created:{resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:notification:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:notifications:updated:{resource_ids}",
+            type=SECURITY,
+        )
+
+    async def post_delete_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:notification:deleted:{resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_delete_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:notifications:deleted:{resource_ids}",
+            type=SECURITY,
         )

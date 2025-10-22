@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -16,9 +17,11 @@ from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.reservedips import ReservedIPsRepository
 from maasservicelayer.models.fields import MacAddress
 from maasservicelayer.models.reservedips import ReservedIP
+from maasservicelayer.services import reservedips as reservedips_module
 from maasservicelayer.services.reservedips import ReservedIPsService
 from maasservicelayer.services.temporal import TemporalService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 TEST_RESERVEDIP = ReservedIP(
@@ -33,7 +36,9 @@ TEST_RESERVEDIP = ReservedIP(
 
 
 @pytest.mark.asyncio
-class TestCommonReservedIPsService(ServiceCommonTests):
+class TestCommonReservedIPsService(ServiceCommonTests, MockLoggerMixin):
+    module = reservedips_module
+
     @pytest.fixture
     def service_instance(self) -> ReservedIPsService:
         return ReservedIPsService(
@@ -54,6 +59,54 @@ class TestCommonReservedIPsService(ServiceCommonTests):
     @pytest.mark.skip(reason="Not implemented yet.")
     async def test_delete_many(self, service_instance, test_instance):
         pass
+
+    async def test_post_create_hook(
+        self,
+        service_instance: ReservedIPsService,
+        test_instance: ReservedIP,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:reservedip:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: ReservedIPsService,
+        test_instance: ReservedIP,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:reservedip:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: ReservedIPsService,
+        test_instance: ReservedIP,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:reservedips:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: ReservedIPsService,
+        test_instance: ReservedIP,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:reservedip:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

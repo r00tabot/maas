@@ -4,7 +4,9 @@
 from typing import List
 
 from pydantic import IPvAnyAddress
+import structlog
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -16,6 +18,8 @@ from maasservicelayer.db.repositories.reservedips import ReservedIPsRepository
 from maasservicelayer.models.reservedips import ReservedIP
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.temporal import TemporalService
+
+logger = structlog.getLogger()
 
 
 class ReservedIPsService(
@@ -37,7 +41,24 @@ class ReservedIPsService(
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:reservedip:created:{resource.id}",
+            type=SECURITY,
+        )
         return
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:reservedip:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:reservedips:updated:{resource_ids}",
+            type=SECURITY,
+        )
 
     async def post_delete_hook(self, resource: ReservedIP) -> None:
         self.temporal_service.register_or_update_workflow_call(
@@ -45,6 +66,10 @@ class ReservedIPsService(
             ConfigureDHCPParam(reserved_ip_ids=[resource.id]),
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:reservedip:deleted:{resource.id}",
+            type=SECURITY,
         )
         return
 

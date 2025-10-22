@@ -2,7 +2,7 @@
 #  GNU Affero General Public License version 3 (see the file LICENSE).
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -49,6 +49,18 @@ class AsyncIteratorMock:
             return self.iterable.pop(0)
         else:
             raise StopAsyncIteration
+
+
+class MockLoggerMixin:
+    module = None
+
+    @pytest.fixture
+    def mock_logger(self):
+        mock = Mock()
+        logger_patch = patch.object(self.module, "logger", mock)
+        logger_patch.start()
+        yield mock
+        logger_patch.stop()
 
 
 @pytest.fixture

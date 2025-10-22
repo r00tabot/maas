@@ -3,6 +3,9 @@
 
 from typing import List
 
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.fabrics import FabricBuilder
 from maasservicelayer.builders.vlans import VlanBuilder
 from maasservicelayer.context import Context
@@ -28,6 +31,8 @@ from maasservicelayer.services.vlans import (
     DEFAULT_VID,
     VlansService,
 )
+
+logger = structlog.getLogger()
 
 
 class FabricsService(BaseService[Fabric, FabricsRepository, FabricBuilder]):
@@ -55,6 +60,22 @@ class FabricsService(BaseService[Fabric, FabricsRepository, FabricBuilder]):
                 mtu=DEFAULT_MTU,
                 dhcp_on=False,
             )
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:fabric:created:{resource.id}", type=SECURITY
+        )
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:fabric:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:fabrics:updated:{resource_ids}",
+            type=SECURITY,
         )
 
     async def pre_delete_hook(self, resource_to_be_deleted: Fabric) -> None:
@@ -121,6 +142,9 @@ class FabricsService(BaseService[Fabric, FabricsRepository, FabricBuilder]):
                 etag_if_match=vlan.etag(),
                 force=True,
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:fabric:deleted:{resource.id}", type=SECURITY
+        )
 
     async def post_delete_many_hook(self, resources: List[Fabric]) -> None:
         raise NotImplementedError("Not implemented yet.")

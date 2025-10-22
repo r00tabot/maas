@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, call, MagicMock, Mock, patch
 
 import pytest
 
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.agents import AgentsClauseFactory
@@ -13,17 +14,21 @@ from maasservicelayer.db.repositories.bootstraptokens import (
 )
 from maasservicelayer.db.repositories.racks import RacksRepository
 from maasservicelayer.models.racks import Rack
+from maasservicelayer.services import racks as racks_module
 from maasservicelayer.services.agents import AgentsService
 from maasservicelayer.services.bootstraptoken import BootstrapTokensService
 from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.racks import RacksService
 from maasservicelayer.services.secrets import SecretsService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestRacksService(ServiceCommonTests):
+class TestRacksService(ServiceCommonTests, MockLoggerMixin):
+    module = racks_module
+
     @pytest.fixture
     def service_instance(self) -> RacksService:
         return RacksService(
@@ -39,6 +44,66 @@ class TestRacksService(ServiceCommonTests):
     def test_instance(self) -> Rack:
         now = utcnow()
         return Rack(id=1, created=now, updated=now, name="rack")
+
+    async def test_post_create_hook(
+        self,
+        service_instance: RacksService,
+        test_instance: Rack,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:rack:created:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self,
+        service_instance: RacksService,
+        test_instance: Rack,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:rack:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_update_many_hook(
+        self,
+        service_instance: RacksService,
+        test_instance: Rack,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_update_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:racks:updated:{[test_instance.id]}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self,
+        service_instance: RacksService,
+        test_instance: Rack,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:rack:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_many_hook(
+        self,
+        service_instance: RacksService,
+        test_instance: Rack,
+        mock_logger: Mock,
+    ):
+        await service_instance.post_delete_many_hook([test_instance])
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:racks:deleted:{[test_instance.id]}",
+            type=SECURITY,
+        )
 
     async def test_delete(self, test_instance: Rack):
         rack = test_instance

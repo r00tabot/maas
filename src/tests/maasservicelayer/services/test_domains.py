@@ -9,6 +9,7 @@ from maascommon.dns import DomainDNSRecord
 from maascommon.enums.dns import DnsUpdateAction
 from maascommon.enums.node import NodeStatus, NodeTypeEnum
 from maascommon.enums.power import PowerState
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.domains import DomainBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.domains import DomainsRepository
@@ -23,17 +24,21 @@ from maasservicelayer.models.base import MaasBaseModel
 from maasservicelayer.models.configurations import MAASInternalDomainConfig
 from maasservicelayer.models.domains import Domain
 from maasservicelayer.models.nodes import Node
+from maasservicelayer.services import domains as domains_module
 from maasservicelayer.services.base import BaseService
 from maasservicelayer.services.configurations import ConfigurationsService
 from maasservicelayer.services.dnspublications import DNSPublicationsService
 from maasservicelayer.services.domains import DomainsService
 from maasservicelayer.services.users import UsersService
 from maasservicelayer.utils.date import utcnow
+from tests.fixtures import MockLoggerMixin
 from tests.maasservicelayer.services.base import ServiceCommonTests
 
 
 @pytest.mark.asyncio
-class TestCommonDomainsService(ServiceCommonTests):
+class TestCommonDomainsService(ServiceCommonTests, MockLoggerMixin):
+    module = domains_module
+
     @pytest.fixture
     def service_instance(self) -> BaseService:
         return DomainsService(
@@ -78,6 +83,33 @@ class TestCommonDomainsService(ServiceCommonTests):
     ):
         with pytest.raises(NotImplementedError):
             await super().test_delete_many(service_instance, test_instance)
+
+    async def test_post_create_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_create_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:domain:created:{test_instance.id}",  # noqa: F821
+            type=SECURITY,
+        )
+
+    async def test_post_update_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_update_hook(test_instance, test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:domain:updated:{test_instance.id}",
+            type=SECURITY,
+        )
+
+    async def test_post_delete_hook(
+        self, service_instance, test_instance: MaasBaseModel, mock_logger: Mock
+    ):
+        await service_instance.post_delete_hook(test_instance)
+        mock_logger.info.assert_called_with(
+            f"{AUTHZ_ADMIN}:domain:deleted:{test_instance.id}",
+            type=SECURITY,
+        )
 
 
 @pytest.mark.asyncio

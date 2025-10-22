@@ -5,6 +5,7 @@
 import structlog
 
 from maascommon.enums.events import EventTypeEnum
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.bootsources import BootSourceBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.filters import QuerySpec
@@ -51,6 +52,10 @@ class BootSourcesService(
             event_type=EventTypeEnum.BOOT_SOURCE,
             event_description=f"Created boot source {resource.url}",
         )
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootsource:created:{resource.id}",
+            type=SECURITY,
+        )
 
     async def post_update_hook(
         self, old_resource: BootSource, updated_resource: BootSource
@@ -62,6 +67,10 @@ class BootSourcesService(
         await self.events_service.record_event(
             event_type=EventTypeEnum.BOOT_SOURCE,
             event_description=description,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootsource:updated:{updated_resource.id}",
+            type=SECURITY,
         )
 
     async def post_delete_hook(self, resource: BootSource) -> None:
@@ -84,4 +93,8 @@ class BootSourcesService(
         await self.events_service.record_event(
             event_type=EventTypeEnum.BOOT_SOURCE,
             event_description=f"Deleted boot source {resource.url}",
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:bootsource:deleted:{resource.id}",
+            type=SECURITY,
         )

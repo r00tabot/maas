@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from typing import List
 
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maasservicelayer.builders.zones import ZoneBuilder
 from maasservicelayer.context import Context
 from maasservicelayer.db.repositories.zones import ZonesRepository
@@ -18,6 +21,8 @@ from maasservicelayer.models.zones import Zone, ZoneWithSummary
 from maasservicelayer.services.base import BaseService, Service, ServiceCache
 from maasservicelayer.services.nodes import NodesService
 from maasservicelayer.services.vmcluster import VmClustersService
+
+logger = structlog.getLogger()
 
 
 @dataclass(slots=True)
@@ -46,8 +51,27 @@ class ZonesService(BaseService[Zone, ZonesRepository, ZoneBuilder]):
     async def get_default_zone(self) -> Zone:
         return await self.repository.get_default_zone()
 
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:zone:created:{resource.id}",
+            type=SECURITY,
+        )
+
     async def post_delete_many_hook(self, resources: List[Zone]) -> None:
         raise NotImplementedError("Not implemented yet.")
+
+    async def post_update_hook(self, old_resource, updated_resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:zone:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
+
+    async def post_update_many_hook(self, resources):
+        resource_ids = [resource.id for resource in resources]
+        logger.info(
+            f"{AUTHZ_ADMIN}:zones:updated:{resource_ids}",
+            type=SECURITY,
+        )
 
     async def pre_delete_hook(self, resource_to_be_deleted: Zone) -> None:
         default_zone = await self.get_default_zone()
@@ -69,6 +93,10 @@ class ZonesService(BaseService[Zone, ZonesRepository, ZoneBuilder]):
             resource.id, default_zone.id
         )
         await self.vmcluster_service.move_to_zone(resource.id, default_zone.id)
+        logger.info(
+            f"{AUTHZ_ADMIN}:zone:deleted:{resource.id}",
+            type=SECURITY,
+        )
 
     async def list_with_summary(
         self, page: int, size: int

@@ -3,6 +3,9 @@
 
 from typing import List
 
+import structlog
+
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -30,6 +33,8 @@ from maasservicelayer.services.temporal import TemporalService
 DEFAULT_VID = 0
 DEFAULT_MTU = 1500
 
+logger = structlog.getLogger()
+
 
 class VlansService(BaseService[Vlan, VlansRepository, VlanBuilder]):
     def __init__(
@@ -52,6 +57,11 @@ class VlansService(BaseService[Vlan, VlansRepository, VlanBuilder]):
     # When the VLAN is created it has no related IPRanges. For this reason it's not possible to enable DHCP
     # at creation time and we don't have to start the temporal workflow. For this reason, we don't have to override the create
     # method of the BaseService
+    async def post_create_hook(self, resource):
+        logger.info(
+            f"{AUTHZ_ADMIN}:vlan:created:{resource.id}",
+            type=SECURITY,
+        )
 
     async def post_update_hook(
         self, old_resource: Vlan, updated_resource: Vlan
@@ -88,6 +98,10 @@ class VlansService(BaseService[Vlan, VlansRepository, VlanBuilder]):
             ),
             parameter_merge_func=merge_configure_dhcp_param,
             wait=False,
+        )
+        logger.info(
+            f"{AUTHZ_ADMIN}:vlan:updated:{updated_resource.id}",
+            type=SECURITY,
         )
         return
 
@@ -127,6 +141,10 @@ class VlansService(BaseService[Vlan, VlansRepository, VlanBuilder]):
                 parameter_merge_func=merge_configure_dhcp_param,
                 wait=False,
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:vlan:deleted:{resource.id}",
+            type=SECURITY,
+        )
 
     async def post_delete_many_hook(self, resources: List[Vlan]) -> None:
         # TODO: When implemented, adjust FabricsService.post_delete_hook

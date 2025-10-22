@@ -4,8 +4,11 @@
 from ipaddress import IPv4Address, IPv6Address
 from typing import List
 
+import structlog
+
 from maascommon.enums.dns import DnsUpdateAction
 from maascommon.enums.subnet import RdnsMode
+from maascommon.logging.security import AUTHZ_ADMIN, SECURITY
 from maascommon.workflows.dhcp import (
     CONFIGURE_DHCP_WORKFLOW_NAME,
     ConfigureDHCPParam,
@@ -48,6 +51,8 @@ from maasservicelayer.services.reservedips import ReservedIPsService
 from maasservicelayer.services.staticipaddress import StaticIPAddressService
 from maasservicelayer.services.staticroutes import StaticRoutesService
 from maasservicelayer.services.temporal import TemporalService
+
+logger = structlog.getLogger()
 
 
 class SubnetsService(BaseService[Subnet, SubnetsRepository, SubnetBuilder]):
@@ -121,6 +126,10 @@ class SubnetsService(BaseService[Subnet, SubnetsRepository, SubnetBuilder]):
                 label="",
                 rtype="",
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:subnet:created:{resource.id}",
+            type=SECURITY,
+        )
 
     async def pre_update_many(self, builder: SubnetBuilder) -> None:
         await self._validate_cidr(None, builder)
@@ -169,6 +178,10 @@ class SubnetsService(BaseService[Subnet, SubnetsRepository, SubnetBuilder]):
                     label="",
                     rtype="",
                 )
+        logger.info(
+            f"{AUTHZ_ADMIN}:subnet:updated:{updated_resource.id}",
+            type=SECURITY,
+        )
 
     async def post_update_many_hook(self, resources: List[Subnet]) -> None:
         raise NotImplementedError("Not implemented yet.")
@@ -231,6 +244,10 @@ class SubnetsService(BaseService[Subnet, SubnetsRepository, SubnetBuilder]):
                 label="",
                 rtype="",
             )
+        logger.info(
+            f"{AUTHZ_ADMIN}:subnet:deleted:{resource.id}",
+            type=SECURITY,
+        )
 
     async def post_delete_many_hook(self, resources: List[Subnet]) -> None:
         raise NotImplementedError("Not implemented yet.")
