@@ -207,6 +207,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "db",
                 "database_user": "maas",
                 "database_pass": "pwd",
+                "database_sslmode": "prefer",
             }
         )
 
@@ -265,6 +266,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "dbname",
                 "database_user": "dbuser",
                 "database_pass": "pwd",
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -281,6 +283,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "dbname",
                 "database_user": "dbuser",
                 "database_pass": "pwd",
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -296,6 +299,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "maasdb",
                 "database_user": "maas",
                 "database_pass": None,
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -310,6 +314,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "foo",
                 "database_user": "foo",
                 "database_pass": None,
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -325,6 +330,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "maasdb",
                 "database_user": "maas",
                 "database_pass": None,
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -340,6 +346,7 @@ class TestCmdInit(MAASTestCase):
                 "database_name": "myuser",
                 "database_user": "myuser",
                 "database_pass": None,
+                "database_sslmode": "prefer",
             },
             settings,
         )
@@ -349,7 +356,7 @@ class TestCmdInit(MAASTestCase):
             [
                 "region+rack",
                 "--database-uri",
-                "postgres://myuser:pwd@myhost:1234/mydb",
+                "postgres://myuser:pwd@myhost:1234/mydb?sslmode=require",
             ]
         )
         settings = snap.get_database_settings(options)
@@ -360,6 +367,7 @@ class TestCmdInit(MAASTestCase):
                 "database_user": "myuser",
                 "database_pass": "pwd",
                 "database_port": 1234,
+                "database_sslmode": "require",
             },
             settings,
         )
@@ -395,6 +403,22 @@ class TestCmdInit(MAASTestCase):
         self.assertEqual(
             "Error parsing database URI: "
             "Unsupported parameters: options, passfile",
+            str(error),
+        )
+
+    def test_get_database_settings_invalid_sslmode(self):
+        options = self.parser.parse_args(
+            [
+                "region+rack",
+                "--database-uri",
+                "postgres://myuser:pwd@myhost/?sslmode=invalid",
+            ]
+        )
+        error = self.assertRaises(
+            snap.DatabaseSettingsError, snap.get_database_settings, options
+        )
+        self.assertEqual(
+            "Invalid sslmode: invalid",
             str(error),
         )
 

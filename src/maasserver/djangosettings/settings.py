@@ -97,6 +97,7 @@ def _get_default_db_config(config: RegionConfiguration) -> dict:
             "keepalives_idle": config.database_keepalive_idle,
             "keepalives_interval": config.database_keepalive_interval,
             "keepalives_count": config.database_keepalive_count,
+            "sslmode": config.database_sslmode,
             "application_name": application_name,
         },
     }

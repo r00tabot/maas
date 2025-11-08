@@ -23,6 +23,9 @@ persistence:
         maxConns: 5
         maxIdleConns: 5
         maxConnLifetime: "5m"
+        tls:
+          enabled: {{ tls_enabled }}
+          enableHostVerification: {{ enable_host_verification }}
 
     visibility:
       sql:
@@ -40,6 +43,9 @@ persistence:
         maxConns: 1
         maxIdleConns: 1
         maxConnLifetime: "5m"
+        tls:
+          enabled: {{ tls_enabled }}
+          enableHostVerification: {{ enable_host_verification }}
 
 global:
   membership:

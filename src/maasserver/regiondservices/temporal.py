@@ -41,7 +41,16 @@ class RegionTemporalService(Service):
         # Can't use the public attribute since it hits
         # maasserver.utils.orm.DisabledDatabaseConnection
         dbconf = settings.DATABASES[django_connection._alias]
-
+        sslmode = dbconf.get("OPTIONS", {}).get("sslmode", "prefer")
+        tls_enabled = sslmode in [
+            "require",
+            "verify-ca",
+            "verify-full",
+        ]
+        verify_ca = sslmode in [
+            "verify-ca",
+            "verify-full",
+        ]
         connection_attributes = {}
         host = dbconf["HOST"]
         if host.startswith("/"):
@@ -81,6 +90,8 @@ class RegionTemporalService(Service):
             "database": dbconf["NAME"],
             "user": dbconf.get("USER", ""),
             "password": dbconf.get("PASSWORD", ""),
+            "tls_enabled": tls_enabled,
+            "enable_host_verification": verify_ca,
             "address": f"{host}:{dbconf['PORT']}",
             "connect_attributes": connection_attributes,
             "broadcast_address": broadcast_address,

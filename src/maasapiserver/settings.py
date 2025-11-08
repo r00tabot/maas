@@ -84,6 +84,7 @@ async def _get_default_db_config(
         username=str(database_user),
         password=str(database_pass),
         port=int(str(config.database_port)),
+        sslmode=str(config.database_sslmode),
     )
 
 

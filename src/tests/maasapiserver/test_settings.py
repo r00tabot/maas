@@ -42,7 +42,7 @@ class TestDatabaseConfig:
         )
         assert (
             str(config.dsn)
-            == "postgresql+asyncpg://user:***@/unix.socket:12345/maasdb"
+            == "postgresql+asyncpg://user:***@/unix.socket:12345/maasdb?ssl=prefer"
         )
 
     def test_host(self):
@@ -51,7 +51,7 @@ class TestDatabaseConfig:
         )
         assert (
             str(config.dsn)
-            == "postgresql+asyncpg://user:***@host:12345/maasdb"
+            == "postgresql+asyncpg://user:***@host:12345/maasdb?ssl=prefer"
         )
 
 
@@ -64,6 +64,7 @@ class TestGetDefaultDBConfig:
                 "database_user": "user",
                 "database_pass": "pass",
                 "database_host": "host",
+                "database_sslmode": "prefer",
                 "database_port": 12345,
             }
         )
@@ -73,6 +74,7 @@ class TestGetDefaultDBConfig:
         assert config.username == "user"
         assert config.password == "pass"
         assert config.port == 12345
+        assert config.sslmode == "prefer"
 
     @pytest.mark.asyncio
     async def test_vault(self, mocker):

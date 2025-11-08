@@ -14,6 +14,7 @@ class DatabaseConfig:
     username: str | None = None
     password: str | None = None
     port: int | None = None
+    sslmode: str = "prefer"
 
     @property
     def dsn(self) -> URL:
@@ -24,6 +25,7 @@ class DatabaseConfig:
             database=self.name,
             username=self.username,
             password=self.password,
+            query={"ssl": self.sslmode},
         )
 
 

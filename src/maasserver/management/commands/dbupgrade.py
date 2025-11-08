@@ -118,24 +118,28 @@ class Command(BaseCommand):
             if dbname is None:
                 dbname = conn_params.get("database")  # Django 3.x
 
-            cmd = (
-                [
-                    get_path("/usr/bin/temporal-sql-tool"),
-                    "--plugin",
-                    "postgres12",
-                    "--endpoint",
-                    endpoint,
-                    "--port",
-                    port,
-                    "--database",
-                    dbname,
-                    "--ca",
-                    "&".join(attributes),
-                ]
-                + user
-                + password
-                + args
-            )
+            cmd = [
+                get_path("/usr/bin/temporal-sql-tool"),
+                "--plugin",
+                "postgres12",
+                "--endpoint",
+                endpoint,
+                "--port",
+                port,
+                "--database",
+                dbname,
+            ]
+            if conn_params.get("sslmode", "prefer") in [
+                "require",
+                "verify-ca",
+                "verify-full",
+            ]:
+                cmd += ["--tls"]
+            cmd += [
+                "--ca",
+                "&".join(attributes),
+            ]
+            cmd += user + password + args
 
             try:
                 subprocess.check_output(cmd, stderr=subprocess.PIPE)
@@ -207,14 +211,15 @@ class Command(BaseCommand):
         host = conn_params.get("host") or "localhost"
         port = conn_params.get("port")
         dbname = conn_params["dbname"]
+        sslmode = conn_params["sslmode"] or "prefer"
 
         auth = f"{user}:{password}@" if password else f"{user}@"
 
         if host.startswith("/"):  # It's a Unix socket
-            return f"postgresql+asyncpg://{auth}localhost/{dbname}?host={host}"
+            return f"postgresql+asyncpg://{auth}localhost/{dbname}?host={host}&ssl={sslmode}"
         else:
             port_part = f":{port}" if port else ""
-            return f"postgresql+asyncpg://{auth}{host}{port_part}/{dbname}"
+            return f"postgresql+asyncpg://{auth}{host}{port_part}/{dbname}?ssl={sslmode}"
 
     @classmethod
     def _should_run_django_migrations(cls, database) -> bool:
