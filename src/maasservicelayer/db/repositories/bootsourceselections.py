@@ -7,12 +7,19 @@ from typing import List
 from sqlalchemy import func, select, Table
 
 from maasservicelayer.db.filters import Clause, ClauseFactory
-from maasservicelayer.db.repositories.base import BaseRepository
+from maasservicelayer.db.repositories.base import (
+    BaseRepository,
+    ReadOnlyRepository,
+)
 from maasservicelayer.db.tables import (
+    BootSourceSelectionStatusView,
     BootSourceSelectionTable,
     BootSourceTable,
 )
-from maasservicelayer.models.bootsourceselections import BootSourceSelection
+from maasservicelayer.models.bootsourceselections import (
+    BootSourceSelection,
+    BootSourceSelectionStatus,
+)
 
 
 class BootSourceSelectionClauseFactory(ClauseFactory):
@@ -112,3 +119,13 @@ class BootSourceSelectionsRepository(BaseRepository[BootSourceSelection]):
         raise NotImplementedError(
             "Update is not supported for bootsourceselections"
         )
+
+
+class BootSourceSelectionStatusRepository(
+    ReadOnlyRepository[BootSourceSelectionStatus]
+):
+    def get_repository_table(self) -> Table:
+        return BootSourceSelectionStatusView
+
+    def get_model_factory(self) -> type[BootSourceSelectionStatus]:
+        return BootSourceSelectionStatus

@@ -28,6 +28,7 @@ from maasapiserver.v3.api.public.models.responses.base import (
 from maasapiserver.v3.api.public.models.responses.boot_source_selections import (
     BootSourceSelectionListResponse,
     BootSourceSelectionResponse,
+    BootSourceSelectionStatusResponse,
     BootSourceSelectionSyncResponse,
 )
 from maasapiserver.v3.api.public.models.responses.boot_sources import (
@@ -539,6 +540,50 @@ class BootSourcesHandler(Handler):
             wait=False,
         )
         return BootSourceSelectionSyncResponse(monitor_url=monitor_url)
+
+    @handler(
+        path="/boot_sources/{boot_source_id}/selections/{id}:status",
+        methods=["POST"],
+        tags=TAGS,
+        responses={
+            200: {
+                "model": BootSourceSelectionStatusResponse,
+            },
+            404: {"model": NotFoundBodyResponse},
+        },
+        response_model_exclude_none=True,
+        status_code=200,
+        dependencies=[
+            Depends(check_permissions(required_roles={UserRole.ADMIN}))
+        ],
+    )
+    async def status_bootsource_bootsourceselection(
+        self,
+        boot_source_id: int,
+        id: int,
+        services: ServiceCollectionV3 = Depends(services),  # noqa: B008
+    ) -> BootSourceSelectionStatusResponse:
+        boot_source_selection = await services.boot_source_selections.get_one(
+            QuerySpec(
+                where=BootSourceSelectionClauseFactory.and_clauses(
+                    [
+                        BootSourceSelectionClauseFactory.with_id(id),
+                        BootSourceSelectionClauseFactory.with_boot_source_id(
+                            boot_source_id
+                        ),
+                    ]
+                )
+            )
+        )
+        if not boot_source_selection:
+            raise NotFoundException()
+
+        status = await services.boot_source_selection_status.get_by_id(
+            boot_source_selection.id
+        )
+        assert status is not None
+
+        return BootSourceSelectionStatusResponse.from_model(status)
 
     @handler(
         path="/boot_sources/{boot_source_id}/selections/{id}:stop_sync",

@@ -3,8 +3,16 @@
 
 from maasservicelayer.models.base import (
     generate_builder,
+    MaasBaseModel,
     MaasTimestampedBaseModel,
 )
+
+
+class BootSourceSelectionStatus(MaasBaseModel):
+    id: int
+    status: str
+    update_status: str
+    sync_percentage: float
 
 
 @generate_builder()
