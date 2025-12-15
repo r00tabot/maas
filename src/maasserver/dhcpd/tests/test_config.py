@@ -1,4 +1,4 @@
-# Copyright 2012-2016 Canonical Ltd.  This software is licensed under the
+# Copyright 2012-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """Test cases for dhcp.config"""
@@ -17,19 +17,19 @@ from fixtures import FakeLogger
 import netaddr
 from testtools.content import Content, text_content, UTF8_TEXT
 
-from maastesting.factory import factory
-from maastesting.testcase import MAASTestCase
-from maastesting.utils import running_in_docker
-from provisioningserver.boot import BootMethodRegistry
-from provisioningserver.dhcp import config
-from provisioningserver.dhcp.config import _get_addresses
-from provisioningserver.dhcp.testing.config import (
+from maasserver.dhcpd import config
+from maasserver.dhcpd.config import _get_addresses
+from maasserver.dhcpd.testing.config import (
     fix_shared_networks_failover,
     make_failover_peer_config,
     make_global_dhcp_snippets,
     make_host,
     make_shared_network,
 )
+from maastesting.factory import factory
+from maastesting.testcase import MAASTestCase
+from maastesting.utils import running_in_docker
+from provisioningserver.boot import BootMethodRegistry
 from provisioningserver.utils import flatten
 import provisioningserver.utils.network as net_utils
 from provisioningserver.utils.shell import get_env_with_locale
@@ -233,7 +233,7 @@ class TestGetConfig(MAASTestCase):
         self.assertEqual(tblines[0], "Traceback (most recent call last):\n")
         self.assertEqual(
             tblines[-1],
-            "provisioningserver.dhcp.config.DHCPConfigError: Failed to render DHCP configuration.\n",
+            "maasserver.dhcpd.config.DHCPConfigError: Failed to render DHCP configuration.\n",
         )
         above_exception = "\nThe above exception was the direct cause of the following exception:\n\n"
         self.assertIn(above_exception, tblines)

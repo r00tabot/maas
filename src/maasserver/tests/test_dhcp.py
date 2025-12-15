@@ -1,5 +1,6 @@
 # Copyright 2012-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
+import base64
 from operator import itemgetter
 import random
 
@@ -10,9 +11,14 @@ from twisted.internet.defer import inlineCallbacks
 
 from maascommon.workflows.dhcp import CONFIGURE_DHCP_WORKFLOW_NAME
 from maasserver import dhcp
+from maasserver import dhcp as dhcp_module
 from maasserver import server_address as server_address_module
-import maasserver.dhcp as dhcp_module
-from maasserver.dhcp import _get_dhcp_rackcontrollers, get_default_dns_servers
+from maasserver.dhcp import (
+    _get_dhcp_rackcontrollers,
+    generate_omapi_key,
+    get_default_dns_servers,
+)
+from maasserver.dhcpd.config import compose_conditional_bootloader
 from maasserver.enum import INTERFACE_TYPE, IPADDRESS_TYPE
 from maasserver.models import Config, DHCPSnippet, Domain
 from maasserver.models import dnspublication as dnspublications_module
@@ -26,8 +32,15 @@ from maasserver.utils.orm import post_commit_hooks
 from maastemporalworker.workflow.dhcp import ConfigureDHCPParam
 from maastesting.crochet import wait_for
 from maastesting.djangotestcase import count_queries
+from maastesting.testcase import MAASTestCase
 
 wait_for_reactor = wait_for()
+
+
+class TestGenerateOmapiKey(MAASTestCase):
+    def test_generate_key(self):
+        key = generate_omapi_key()
+        self.assertEqual(len(base64.decodebytes(key.encode("ascii"))), 64)
 
 
 class TestGetOMAPIKey(MAASServerTestCase):
@@ -1321,7 +1334,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1343,7 +1355,8 @@ class TestMakeSubnetConfig(MAASServerTestCase):
                 "search_list",
                 "pools",
                 "dhcp_snippets",
-                "disabled_boot_architectures",
+                "next_server",
+                "bootloader",
             },
         )
 
@@ -1358,7 +1371,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([maas_dns], config["dns_servers"])
 
@@ -1373,7 +1386,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([maas_dns], config["dns_servers"])
 
@@ -1400,7 +1413,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet1, dns_servers, ntp_servers, default_domain
+            subnet1, dns_servers, ntp_servers, default_domain
         )
         self.assertEqual(dns_servers[:1], config["dns_servers"])
 
@@ -1427,7 +1440,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet2, dns_servers, ntp_servers, default_domain
+            subnet2, dns_servers, ntp_servers, default_domain
         )
         self.assertEqual(dns_servers[1:], config["dns_servers"])
 
@@ -1441,7 +1454,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [""], ntp_servers, default_domain
+            subnet, [""], ntp_servers, default_domain
         )
         self.assertEqual(config["ntp_servers"], ntp_servers)
 
@@ -1453,9 +1466,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
             INTERFACE_TYPE.PHYSICAL, vlan=vlan, node=rack_controller
         )
         default_domain = Domain.objects.get_default_domain()
-        config = dhcp.make_subnet_config(
-            rack_controller, subnet, [""], {}, default_domain
-        )
+        config = dhcp.make_subnet_config(subnet, [""], {}, default_domain)
         self.assertEqual(config["ntp_servers"], [])
 
     def test_sets_ntp_from_dict_argument(self):
@@ -1475,7 +1486,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         }
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [""], ntp_servers, default_domain
+            subnet, [""], ntp_servers, default_domain
         )
         self.assertEqual(config["ntp_servers"], [address.ip])
 
@@ -1504,11 +1515,11 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         }
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            r1, subnet, [""], r1_ntp_servers, default_domain, peer_rack=r2
+            subnet, [""], r1_ntp_servers, default_domain, peer_rack=r2
         )
         self.assertEqual(config["ntp_servers"], [a1.ip, a2.ip])
         config = dhcp.make_subnet_config(
-            r2, subnet, [""], r2_ntp_servers, default_domain, peer_rack=r1
+            subnet, [""], r2_ntp_servers, default_domain, peer_rack=r1
         )
         self.assertEqual(config["ntp_servers"], [a2.ip, a1.ip])
 
@@ -1525,7 +1536,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual(
             [maas_dns, IPAddress("8.8.8.8"), IPAddress("8.8.4.4")],
@@ -1543,7 +1554,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([maas_dns], config["dns_servers"])
 
@@ -1563,7 +1574,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual(
             [IPAddress("8.8.8.8"), IPAddress("8.8.4.4")],
@@ -1583,7 +1594,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([], config["dns_servers"])
 
@@ -1600,7 +1611,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual(
             config["dns_servers"],
@@ -1618,7 +1629,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([maas_dns], config["dns_servers"])
 
@@ -1638,7 +1649,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual(
             [IPAddress("2001:db8::1"), IPAddress("2001:db8::2")],
@@ -1658,7 +1669,7 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ntp_servers = [factory.make_name("ntp")]
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller, subnet, [maas_dns], ntp_servers, default_domain
+            subnet, [maas_dns], ntp_servers, default_domain
         )
         self.assertEqual([], config["dns_servers"])
 
@@ -1671,7 +1682,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1688,7 +1698,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1709,7 +1718,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1732,7 +1740,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         default_domain = Domain.objects.get_default_domain()
         search_list = [default_domain.name, "foo.example.com"]
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1760,7 +1767,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         default_domain = Domain.objects.get_default_domain()
         search_list = [default_domain.name, "foo.example.com"]
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv6_address()],
             [factory.make_name("ntp")],
@@ -1795,7 +1801,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1831,7 +1836,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         default_domain = Domain.objects.get_default_domain()
         failover_peer = factory.make_name("peer")
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1867,7 +1871,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         subnet.gateway_ip = None
         subnet.save()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1888,7 +1891,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
             for _ in range(3)
         ]
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1905,26 +1907,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
                 for dhcp_snippet in dhcp_snippets
             ],
             config["dhcp_snippets"],
-        )
-
-    def test_returns_disabled_boot_architectures(self):
-        rack_controller = factory.make_RackController(interface=False)
-        vlan = factory.make_VLAN()
-        subnet = factory.make_Subnet(vlan=vlan)
-        factory.make_Interface(
-            INTERFACE_TYPE.PHYSICAL, vlan=vlan, node=rack_controller
-        )
-        default_domain = Domain.objects.get_default_domain()
-        config = dhcp.make_subnet_config(
-            rack_controller,
-            subnet,
-            [factory.make_ipv4_address()],
-            [factory.make_name("ntp")],
-            default_domain,
-        )
-        self.assertEqual(
-            subnet.disabled_boot_architectures,
-            config["disabled_boot_architectures"],
         )
 
     def test_returns_iprange_dhcp_snippets(self):
@@ -1952,7 +1934,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         ]
         dhcp_snippets = subnet_snippets + iprange_snippets
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet,
             [factory.make_ipv4_address()],
             [factory.make_name("ntp")],
@@ -1998,7 +1979,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         default_domain = Domain.objects.get_default_domain()
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet1,
             [rackip1, rackip2],
             [factory.make_name("ntp")],
@@ -2007,7 +1987,6 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         self.assertIn(rackip1, config["dns_servers"])
         self.assertIn(rackip2, config["dns_servers"])
         config = dhcp.make_subnet_config(
-            rack_controller,
             subnet2,
             [rackip1, rackip2],
             [factory.make_name("ntp")],
@@ -2015,6 +1994,67 @@ class TestMakeSubnetConfig(MAASServerTestCase):
         )
         self.assertNotIn(rackip1, config["dns_servers"])
         self.assertIn(rackip2, config["dns_servers"])
+
+    def test_next_server_is_picked_from_ip_addresses(self):
+        rack_controller = factory.make_RackController(interface=False)
+        vlan = factory.make_VLAN()
+        subnet = factory.make_Subnet(vlan=vlan, cidr="10.0.0.0/24")
+        ip_in_subnet = factory.pick_ip_in_Subnet(subnet=subnet)
+
+        other_subnet = factory.make_Subnet(vlan=vlan, cidr="11.0.0.0/24")
+        ip_in_other_subnet = factory.pick_ip_in_Subnet(subnet=other_subnet)
+
+        factory.make_Interface(
+            INTERFACE_TYPE.PHYSICAL,
+            vlan=vlan,
+            node=rack_controller,
+            ip=ip_in_subnet,
+        )
+        factory.make_Interface(
+            INTERFACE_TYPE.PHYSICAL,
+            vlan=vlan,
+            node=rack_controller,
+            ip=ip_in_other_subnet,
+        )
+
+        config = dhcp.make_subnet_config(
+            subnet,
+            [],
+            [],
+            Domain.objects.get_default_domain(),
+            ip_addresses=[ip_in_subnet, ip_in_other_subnet],
+        )
+
+        self.assertEqual(ip_in_subnet, config["next_server"])
+
+    def test_next_server_is_picked_from_ip_addresses_even_if_not_in_network(
+        self,
+    ):
+        rack_controller = factory.make_RackController(interface=False)
+        vlan = factory.make_VLAN()
+        subnet = factory.make_Subnet(vlan=vlan, cidr="10.0.0.0/24")
+        other_subnet = factory.make_Subnet(vlan=vlan, cidr="11.0.0.0/24")
+        ip_in_other_subnet = factory.pick_ip_in_Subnet(subnet=other_subnet)
+
+        factory.make_Interface(
+            INTERFACE_TYPE.PHYSICAL, vlan=vlan, node=rack_controller
+        )
+        factory.make_Interface(
+            INTERFACE_TYPE.PHYSICAL,
+            vlan=vlan,
+            node=rack_controller,
+            ip=ip_in_other_subnet,
+        )
+
+        config = dhcp.make_subnet_config(
+            subnet,
+            [],
+            [],
+            Domain.objects.get_default_domain(),
+            ip_addresses=[ip_in_other_subnet],
+        )
+
+        self.assertEqual(ip_in_other_subnet, config["next_server"])
 
 
 class TestMakeHostsForSubnet(MAASServerTestCase):
@@ -2606,7 +2646,12 @@ class TestGetDHCPConfigureFor(MAASServerTestCase):
                             }
                             for dhcp_snippet in ha_dhcp_snippets
                         ],
-                        "disabled_boot_architectures": ha_subnet.disabled_boot_architectures,
+                        "next_server": primary_ip.ip,
+                        "bootloader": compose_conditional_bootloader(
+                            False,
+                            primary_ip.ip,
+                            ha_subnet.disabled_boot_architectures,
+                        ),
                         "pools": [
                             {
                                 "ip_range_low": str(ip_range.start_ip),
@@ -2641,7 +2686,12 @@ class TestGetDHCPConfigureFor(MAASServerTestCase):
                             }
                             for dhcp_snippet in other_dhcp_snippets
                         ],
-                        "disabled_boot_architectures": other_subnet.disabled_boot_architectures,
+                        "next_server": primary_ip.ip,
+                        "bootloader": compose_conditional_bootloader(
+                            False,
+                            primary_ip.ip,
+                            other_subnet.disabled_boot_architectures,
+                        ),
                         "pools": [
                             {
                                 "ip_range_low": str(ip_range.start_ip),
@@ -2774,7 +2824,12 @@ class TestGetDHCPConfigureFor(MAASServerTestCase):
                             }
                             for dhcp_snippet in ha_dhcp_snippets
                         ],
-                        "disabled_boot_architectures": ha_subnet.disabled_boot_architectures,
+                        "next_server": primary_ip.ip,
+                        "bootloader": compose_conditional_bootloader(
+                            True,
+                            primary_ip.ip,
+                            ha_subnet.disabled_boot_architectures,
+                        ),
                         "pools": [
                             {
                                 "ip_range_low": str(ip_range.start_ip),
@@ -2804,7 +2859,12 @@ class TestGetDHCPConfigureFor(MAASServerTestCase):
                             }
                             for dhcp_snippet in other_dhcp_snippets
                         ],
-                        "disabled_boot_architectures": other_subnet.disabled_boot_architectures,
+                        "next_server": primary_ip.ip,
+                        "bootloader": compose_conditional_bootloader(
+                            True,
+                            primary_ip.ip,
+                            other_subnet.disabled_boot_architectures,
+                        ),
                         "pools": [
                             {
                                 "ip_range_low": str(ip_range.start_ip),

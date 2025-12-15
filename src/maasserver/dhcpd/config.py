@@ -1,4 +1,4 @@
-# Copyright 2012-2021 Canonical Ltd.  This software is licensed under the
+# Copyright 2012-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """Write config output for ISC DHCPD."""
@@ -8,13 +8,13 @@ import logging
 import socket
 from typing import Sequence
 
-from netaddr import IPAddress, IPNetwork, IPRange
+from netaddr import IPAddress, IPRange
 import tempita
 
+from maasserver.utils import load_template
 from provisioningserver.boot import BootMethodRegistry
 from provisioningserver.path import get_maas_data_path, get_path
-from provisioningserver.utils import load_template, snap
-import provisioningserver.utils.network as net_utils
+from provisioningserver.utils import snap
 from provisioningserver.utils.text import (
     normalise_to_comma_list,
     normalise_whitespace,
@@ -390,33 +390,6 @@ def normalise_any_iterable_to_quoted_comma_list(iterable):
         return ", ".join(map(quote, iterable))
 
 
-def get_rack_ip_for_subnet(version, cidr, interface):
-    """
-    Return the IP address on this rack controller.
-
-    First the code will try to find an IP address that is in the cidr, but if
-    not it will use the first IP address on the interface (to support
-    VLAN relay).
-    """
-    cidr = IPNetwork(cidr)
-    if interface:
-        ip_addresses = [
-            IPAddress(addr)
-            for addr in net_utils.get_all_addresses_for_interface(interface)
-        ]
-    else:
-        ip_addresses = [
-            IPAddress(addr) for addr in net_utils.get_all_interface_addresses()
-        ]
-    for ip_addr in ip_addresses:
-        if ip_addr in cidr:
-            return ip_addr
-    for ip_addr in ip_addresses:
-        if ip_addr.version == version:
-            return ip_addr
-    return None
-
-
 def get_config_v4(
     template_name: str,
     global_dhcp_snippets: Sequence[dict],
@@ -443,16 +416,7 @@ def get_config_v4(
     }
 
     for shared_network in shared_networks:
-        interface = shared_network.get("interface", None)
         for subnet in shared_network["subnets"]:
-            rack_ip = get_rack_ip_for_subnet(
-                4, subnet["subnet_cidr"], interface
-            )
-            if rack_ip is not None:
-                subnet["next_server"] = rack_ip
-                subnet["bootloader"] = compose_conditional_bootloader(
-                    False, rack_ip, subnet.get("disabled_boot_architectures")
-                )
             ntp_servers = subnet["ntp_servers"]  # Is a list.
             ntp_servers_ipv4, ntp_servers_ipv6 = _get_addresses(*ntp_servers)
             subnet["ntp_servers_ipv4"] = ", ".join(ntp_servers_ipv4)
@@ -530,15 +494,7 @@ def _process_network_parameters_v6(failover_peers, shared_networks):
     peers = {x["name"]: x for x in failover_peers}
 
     for shared_network in shared_networks:
-        interface = shared_network.get("interface", None)
         for subnet in shared_network["subnets"]:
-            rack_ip = get_rack_ip_for_subnet(
-                6, subnet["subnet_cidr"], interface
-            )
-            if rack_ip is not None:
-                subnet["bootloader"] = compose_conditional_bootloader(
-                    True, rack_ip, subnet.get("disabled_boot_architectures")
-                )
             ntp_servers = subnet["ntp_servers"]  # Is a list.
             ntp_servers_ipv4, ntp_servers_ipv6 = _get_addresses(*ntp_servers)
             subnet["ntp_servers_ipv4"] = ", ".join(ntp_servers_ipv4)
