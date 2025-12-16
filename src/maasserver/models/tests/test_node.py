@@ -9640,7 +9640,7 @@ class TestNode_Start(MAASTransactionServerTestCase):
             user, power_type="manual"
         )
         user_data = factory.make_bytes()
-        NodeUserData.objects.set_user_data(node, user_data)
+        NodeUserData.objects.set_user_data_for_ephimeral_env(node, user_data)
         node.start(user, user_data=None)
         self.assertFalse(NodeUserData.objects.filter(node=node).exists())
 

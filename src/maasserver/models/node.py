@@ -1332,6 +1332,15 @@ class Node(CleanSave, TimestampedModel):
         related_name="+",
     )
 
+    # The ScriptSet for the currently running, or last run, deployment ScriptSet.
+    current_deployment_script_set = ForeignKey(
+        "maasserver.ScriptSet",
+        blank=True,
+        null=True,
+        on_delete=SET_NULL,
+        related_name="+",
+    )
+
     locked = BooleanField(default=False)
 
     last_applied_storage_layout = CharField(max_length=50, blank=True)
@@ -2518,6 +2527,7 @@ class Node(CleanSave, TimestampedModel):
             starting = self._start(
                 user,
                 commissioning_user_data,
+                None,
                 old_status,
                 allow_power_cycle=True,
                 config=config,
@@ -2694,7 +2704,11 @@ class Node(CleanSave, TimestampedModel):
 
         try:
             starting = self._start(
-                user, testing_user_data, old_status, allow_power_cycle=True
+                user,
+                testing_user_data,
+                None,
+                old_status,
+                allow_power_cycle=True,
             )
         except Exception as error:
             self.update_status(old_status)
@@ -3568,6 +3582,7 @@ class Node(CleanSave, TimestampedModel):
             starting = self._start(
                 user,
                 disk_erase_user_data,
+                None,
                 old_status,
                 allow_power_cycle=True,
                 config=config,
@@ -3841,6 +3856,7 @@ class Node(CleanSave, TimestampedModel):
             starting = self._start(
                 user,
                 user_data,
+                None,
                 old_status,
                 allow_power_cycle=True,
                 config=config,
@@ -3984,6 +4000,7 @@ class Node(CleanSave, TimestampedModel):
         self.license_key = ""
         self.hwe_kernel = None
         self.current_installation_script_set = None
+        self.current_deployment_script_set = None
         self.install_rackd = False
         self.install_kvm = False
         self.register_vmhost = False
@@ -5859,8 +5876,18 @@ class Node(CleanSave, TimestampedModel):
         self._register_request_event(
             user, event, action="start", comment=comment
         )
+        deployment_ephimeral_user_data = generate_user_data_for_status(
+            node=self,
+            status=NODE_STATUS.DEPLOYING,
+        )
+        from maasserver.models import ScriptSet
+
+        self.current_deployment_script_set = (
+            ScriptSet.objects.create_deployment_script_set(self)
+        )
         return self._start(
             user,
+            deployment_ephimeral_user_data,
             user_data,
             allow_power_cycle=allow_power_cycle,
         )
@@ -5990,13 +6017,20 @@ class Node(CleanSave, TimestampedModel):
                         f"for {arch}/{platform} is unavailable."
                     )
 
-    def set_user_data(self, user_data: bytes | None = None) -> None:
+    def set_user_data(
+        self, ephimeral_env: bool, user_data: bytes | None = None
+    ) -> None:
         from maasserver.models import NodeUserData
 
         # Record the user data for the node. Note that we do this
         # whether or not we can actually send power commands to the
         # node; the user may choose to start it manually.
-        NodeUserData.objects.set_user_data(self, user_data)
+        if ephimeral_env:
+            NodeUserData.objects.set_user_data_for_ephimeral_env(
+                self, user_data
+            )
+        else:
+            NodeUserData.objects.set_user_data_for_user_env(self, user_data)
 
     def _temporal_deploy(
         self,
@@ -6037,7 +6071,8 @@ class Node(CleanSave, TimestampedModel):
     def _start(
         self,
         user: User,
-        user_data: bytes | None = None,
+        user_data_for_ephimeral_env: bytes | None = None,
+        user_data_for_user_env: bytes | None = None,
         old_status=None,
         allow_power_cycle: bool = False,
         config=None,
@@ -6046,10 +6081,10 @@ class Node(CleanSave, TimestampedModel):
 
         :param user: Requesting user.
         :type user: User_
-        :param user_data: Optional blob of user-data to be made available to
+        :param user_data_for_ephimeral_env: Optional blob of user-data to be made available to
             the node through the metadata service. If not given, any previous
             user data is used.
-        :type user_data: unicode
+        :type user_data_for_ephimeral_env: unicode
 
         :raise StaticIPAddressExhaustion: if there are not enough IP addresses
             left in the static range for this node to get all the addresses it
@@ -6070,7 +6105,12 @@ class Node(CleanSave, TimestampedModel):
 
         self.validate_bootresource_exists_for_action(config=config)
 
-        self.set_user_data(user_data=user_data)
+        self.set_user_data(
+            ephimeral_env=True, user_data=user_data_for_ephimeral_env
+        )
+        self.set_user_data(
+            ephimeral_env=False, user_data=user_data_for_user_env
+        )
 
         # Auto IP allocation and power on action are attached to the
         # post commit of the transaction.
@@ -6522,7 +6562,9 @@ class Node(CleanSave, TimestampedModel):
         # Record the user data for the node. Note that we do this
         # whether or not we can actually send power commands to the
         # node; the user may choose to start it manually.
-        NodeUserData.objects.set_user_data(self, rescue_mode_user_data)
+        NodeUserData.objects.set_user_data_for_ephimeral_env(
+            self, rescue_mode_user_data
+        )
 
         # We need to mark the node as ENTERING_RESCUE_MODE now to avoid a race
         # when starting multiple nodes. We hang on to old_status just in

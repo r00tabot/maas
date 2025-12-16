@@ -4,6 +4,7 @@
 """Node user-data for cloud-init's use."""
 
 from django.db.models import CASCADE, Manager, Model, OneToOneField
+from django.db.models.fields import BooleanField
 
 from maasserver.models.cleansave import CleanSave
 from metadataserver.fields import Bin, BinaryField
@@ -12,37 +13,59 @@ from metadataserver.fields import Bin, BinaryField
 class NodeUserDataManager(Manager):
     """Utility for the collection of NodeUserData items."""
 
-    def set_user_data(self, node, data):
+    def set_user_data_for_ephimeral_env(self, node, data):
         """Set user data for the given node.
 
         If `data` is None, remove user data for the node.
         """
         if data is None:
-            self._remove(node)
+            self._remove(node, for_ephimeral_environment=True)
         else:
-            self._set(node, data)
+            self._set(node, data, for_ephimeral_environment=True)
 
-    def get_user_data(self, node):
+    def get_user_data_for_ephimeral_env(self, node):
         """Retrieve user data for the given node."""
-        return self.get(node=node).data
+        return self.get(node=node, for_ephimeral_environment=True).data
 
-    def has_user_data(self, node):
+    def has_any_user_data(self, node):
         """Do we have user data registered for node?"""
         return self.filter(node=node).exists()
 
-    def _set(self, node, data):
+    def set_user_data_for_user_env(self, node, data):
+        """Set user data for the given node.
+
+        If `data` is None, remove user data for the node.
+        """
+        if data is None:
+            self._remove(node, for_ephimeral_environment=False)
+        else:
+            self._set(node, data, for_ephimeral_environment=False)
+
+    def get_user_data_for_user_env(self, node):
+        """Retrieve user data for the given node."""
+        return self.get(node=node, for_ephimeral_environment=False).data
+
+    def has_user_data_for_user_env(self, node):
+        """Do we have user data registered for node?"""
+        return self.filter(node=node, for_ephimeral_environment=False).exists()
+
+    def _set(self, node, data, for_ephimeral_environment: bool):
         """Set actual user data for a node.  Not usable if data is None."""
         wrapped_data = Bin(data)
         (existing_entry, created) = self.get_or_create(
-            node=node, defaults={"data": wrapped_data}
+            node=node,
+            for_ephimeral_environment=for_ephimeral_environment,
+            defaults={"data": wrapped_data},
         )
         if not created:
             existing_entry.data = wrapped_data
             existing_entry.save()
 
-    def _remove(self, node):
+    def _remove(self, node, for_ephimeral_environment: bool):
         """Remove metadata from node, if it has any any."""
-        self.filter(node=node).delete()
+        self.filter(
+            node=node, for_ephimeral_environment=for_ephimeral_environment
+        ).delete()
 
     def bulk_set_user_data(self, nodes, data):
         """Set the user data for the given nodes in bulk.
@@ -72,4 +95,7 @@ class NodeUserData(CleanSave, Model):
     node = OneToOneField(
         "maasserver.Node", null=False, editable=False, on_delete=CASCADE
     )
+
     data = BinaryField(null=False)
+
+    for_ephimeral_environment = BooleanField(null=False)
