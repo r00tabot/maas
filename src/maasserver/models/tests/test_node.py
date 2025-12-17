@@ -2296,9 +2296,10 @@ class TestNode(MAASServerTestCase):
         self.assertEqual(node.status, NODE_STATUS.DISK_ERASING)
         self.assertEqual(node.agent_name, agent_name)
         node_start.assert_called_once_with(
-            owner,
-            ANY,
-            NODE_STATUS.ALLOCATED,
+            user=owner,
+            user_data_for_ephemeral_env=ANY,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.ALLOCATED,
             allow_power_cycle=True,
             config=config,
         )
@@ -2323,9 +2324,10 @@ class TestNode(MAASServerTestCase):
         with post_commit_hooks:
             node.start_disk_erasing(owner)
         node_start.assert_called_once_with(
-            owner,
-            ANY,
-            NODE_STATUS.ALLOCATED,
+            user=owner,
+            user_data_for_ephemeral_env=ANY,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.ALLOCATED,
             allow_power_cycle=True,
             config=config,
         )
@@ -2407,9 +2409,10 @@ class TestNode(MAASServerTestCase):
             pass
 
         node_start.assert_called_once_with(
-            admin,
-            generate_user_data_for_status.return_value,
-            NODE_STATUS.ALLOCATED,
+            user=admin,
+            user_data_for_ephemeral_env=generate_user_data_for_status.return_value,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.ALLOCATED,
             allow_power_cycle=True,
             config=config,
         )
@@ -3334,9 +3337,10 @@ class TestNode(MAASServerTestCase):
         node = reload_object(node)
         self.assertEqual(node.status, NODE_STATUS.COMMISSIONING)
         node_start.assert_called_once_with(
-            admin,
-            ANY,
-            NODE_STATUS.NEW,
+            user=admin,
+            user_data_for_ephemeral_env=ANY,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.NEW,
             allow_power_cycle=True,
             config=config,
         )
@@ -3390,9 +3394,10 @@ class TestNode(MAASServerTestCase):
         node.start_commissioning(admin)
         post_commit_hooks.reset()  # Ignore these for now.
         node_start.assert_called_once_with(
-            admin,
-            user_data,
-            NODE_STATUS.NEW,
+            user=admin,
+            user_data_for_ephemeral_env=user_data,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.NEW,
             allow_power_cycle=True,
             config=config,
         )
@@ -3470,9 +3475,10 @@ class TestNode(MAASServerTestCase):
         self.assertEqual(node.status, NODE_STATUS.COMMISSIONING)
         self.assertEqual(node.owner, admin)
         node_start.assert_called_once_with(
-            admin,
-            ANY,
-            NODE_STATUS.NEW,
+            user=admin,
+            user_data_for_ephemeral_env=ANY,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.NEW,
             allow_power_cycle=True,
             config=config,
         )
@@ -3707,9 +3713,10 @@ class TestNode(MAASServerTestCase):
             pass
 
         node_start.assert_called_once_with(
-            admin,
-            generate_user_data_for_status.return_value,
-            NODE_STATUS.NEW,
+            user=admin,
+            user_data_for_ephemeral_env=generate_user_data_for_status.return_value,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.NEW,
             allow_power_cycle=True,
             config=config,
         )
@@ -4069,7 +4076,11 @@ class TestNode(MAASServerTestCase):
         node.start_testing(admin, testing_scripts=[script.name])
         post_commit_hooks.reset()  # Ignore these for now.
         node_start.assert_called_once_with(
-            admin, user_data, NODE_STATUS.DEPLOYED, allow_power_cycle=True
+            user=admin,
+            user_data_for_ephemeral_env=user_data,
+            user_data_for_user_env=None,
+            old_status=NODE_STATUS.DEPLOYED,
+            allow_power_cycle=True,
         )
 
     def test_start_testing_adds_default_testing_script_set(self):
@@ -4242,6 +4253,40 @@ class TestNode(MAASServerTestCase):
         )
         self.assertEqual(0, ScriptSet.objects.count())
         self.assertEqual(0, ScriptResult.objects.count())
+
+    def test_start_deploy_sets_user_data(self):
+        load_builtin_scripts()
+        script = factory.make_Script(script_type=SCRIPT_TYPE.DEPLOYMENT)
+        node = factory.make_Node(status=NODE_STATUS.ALLOCATED)
+        node_start = self.patch(node, "_start")
+        node_start.side_effect = lambda *args, **kwargs: post_commit()
+        user_data = factory.make_string().encode("ascii")
+        ephemeral_user_data = factory.make_string().encode("ascii")
+        generate_user_data_for_status = self.patch(
+            node_module, "generate_user_data_for_status"
+        )
+        generate_user_data_for_status.return_value = user_data
+        admin = factory.make_admin()
+        node.start(user=admin, user_data=ephemeral_user_data)
+        post_commit_hooks.reset()  # Ignore these for now.
+        reload_object(node)
+
+        scripts = node.current_deployment_script_set.scriptresult_set
+        self.assertEqual(scripts.count(), 2)
+        self.assertTrue(scripts.filter(script=script).exists())
+        self.assertTrue(
+            scripts.filter(script__name="50-curtin-install").exists()
+        )
+
+        generate_user_data_for_status.assert_called_once_with(
+            node=node, status=NODE_STATUS.ALLOCATED
+        )
+        node_start.assert_called_once_with(
+            user=admin,
+            user_data_for_ephemeral_env=user_data,
+            user_data_for_user_env=ephemeral_user_data,
+            allow_power_cycle=True,
+        )
 
     def test_udpate_status_logs_node_status_transition(self):
         self.disable_node_query()
@@ -9317,6 +9362,7 @@ class TestNode_Start(MAASTransactionServerTestCase):
         self.patch_autospec(
             node_module, "get_temporal_task_queue_for_bmc"
         ).return_value = ""
+        load_builtin_scripts()
 
     def make_acquired_node_with_interface(
         self,
@@ -9631,7 +9677,9 @@ class TestNode_Start(MAASTransactionServerTestCase):
         )
         user_data = factory.make_bytes()
         node.start(user, user_data=user_data)
-        nud = NodeUserData.objects.get(node=node)
+        nud = NodeUserData.objects.get(
+            node=node, for_ephemeral_environment=False
+        )
         self.assertEqual(user_data, nud.data)
 
     def test_resets_user_data(self):
@@ -9640,9 +9688,13 @@ class TestNode_Start(MAASTransactionServerTestCase):
             user, power_type="manual"
         )
         user_data = factory.make_bytes()
-        NodeUserData.objects.set_user_data(node, user_data)
+        NodeUserData.objects.set_user_data_for_user_env(node, user_data)
         node.start(user, user_data=None)
-        self.assertFalse(NodeUserData.objects.filter(node=node).exists())
+        self.assertFalse(
+            NodeUserData.objects.filter(
+                node=node, for_ephemeral_environment=False
+            ).exists()
+        )
 
     def test_sets_to_deploying(self):
         user = factory.make_User()
