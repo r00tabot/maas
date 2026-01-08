@@ -60,10 +60,17 @@ class TestAuthService:
             secrets_service=secrets_service_mock,
             users_service=users_service_mock,
         )
-        token = await auth_service.login(user.username, "test")
+        result = await auth_service.login(user.username, "test")
+        token, user_id, csrf_token = (
+            result.jwt,
+            result.user_id,
+            result.csrf_token,
+        )
         assert len(token.encoded) > 0
         assert token.subject == user.username
         assert token.roles == [UserRole.USER]
+        assert user_id == user.id
+        assert csrf_token is not None
         users_service_mock.get_one.assert_awaited_once_with(
             QuerySpec(UserClauseFactory.with_username(user.username))
         )
@@ -99,10 +106,17 @@ class TestAuthService:
             secrets_service=secrets_service_mock,
             users_service=users_service_mock,
         )
-        token = await auth_service.login(admin.username, "test")
+        result = await auth_service.login(admin.username, "test")
+        token, user_id, csrf_token = (
+            result.jwt,
+            result.user_id,
+            result.csrf_token,
+        )
         assert len(token.encoded) > 0
         assert token.subject == admin.username
         assert set(token.roles) == {UserRole.USER, UserRole.ADMIN}
+        assert user_id == admin.id
+        assert csrf_token is not None
         users_service_mock.get_one.assert_awaited_once_with(
             QuerySpec(UserClauseFactory.with_username(admin.username))
         )
@@ -167,14 +181,16 @@ class TestAuthService:
             secrets_service=secrets_service_mock,
             users_service=users_service_mock,
         )
-        token = await auth_service.login(user.username, "test")
+        result = await auth_service.login(user.username, "test")
+        token, _ = result.jwt, result.user_id
         assert token.subject == user.username
         assert AuthService.JWT_TOKEN_KEY == "123"
         secrets_service_mock.get_simple_secret.assert_called_once_with(
             AuthService.MAAS_V3_JWT_KEY_SECRET
         )
 
-        token = await auth_service.login(user.username, "test")
+        result = await auth_service.login(user.username, "test")
+        token, _ = result.jwt, result.user_id
         assert token.subject == user.username
         # The service is not loading anymore the key because it was cached
         secrets_service_mock.get_simple_secret.assert_called_once_with(
@@ -195,7 +211,8 @@ class TestAuthService:
             secrets_service=secrets_service_mock,
             users_service=users_service_mock,
         )
-        token = await auth_service.login(user.username, "test")
+        result = await auth_service.login(user.username, "test")
+        token, _ = result.jwt, result.user_id
         assert token.subject == user.username
         assert AuthService.JWT_TOKEN_KEY is not None
         secrets_service_mock.get_simple_secret.assert_called_once_with(

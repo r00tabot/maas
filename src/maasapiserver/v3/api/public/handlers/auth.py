@@ -1,6 +1,8 @@
 # Copyright 2024 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from datetime import timedelta
+
 from fastapi import Depends, Header, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -44,6 +46,7 @@ from maasservicelayer.exceptions.constants import (
 )
 from maasservicelayer.models.auth import AuthenticatedUser
 from maasservicelayer.services import ServiceCollectionV3
+from maasservicelayer.utils.date import utcnow
 
 
 class AuthHandler(Handler):
@@ -71,6 +74,7 @@ class AuthHandler(Handler):
         request: Request,
         services: ServiceCollectionV3 = Depends(services),  # noqa: B008
         form_data: OAuth2PasswordRequestForm = Depends(),  # noqa: B008
+        cookie_manager: EncryptedCookieManager = Depends(cookie_manager),  # noqa: B008
     ) -> AccessTokenResponse:
         if (
             external_auth_info
@@ -81,11 +85,17 @@ class AuthHandler(Handler):
                 extract_absolute_uri(request),
                 request.headers,
             )
-        token = await services.auth.login(
+        login_info = await services.auth.login(
             form_data.username, form_data.password
         )
+        session = await services.django_session.create_session(
+            user_id=login_info.user_id,
+            expires_at=utcnow() + timedelta(minutes=10),
+        )
+        cookie_manager.set_unsafe_cookie("sessionid", session.session_key)
+        cookie_manager.set_unsafe_cookie("csrftoken", login_info.csrf_token)
         return AccessTokenResponse(
-            token_type=self.TOKEN_TYPE, access_token=token.encoded
+            token_type=self.TOKEN_TYPE, access_token=login_info.jwt.encoded
         )
 
     @handler(
@@ -132,7 +142,7 @@ class AuthHandler(Handler):
         email: str,
         services: ServiceCollectionV3 = Depends(services),  # noqa: B008
         cookie_manager: EncryptedCookieManager = Depends(cookie_manager),  # noqa: B008
-    ):
+    ) -> AuthInfoResponse:
         """Initiate the OAuth flow by generating the authorization URL and setting the necessary security cookies,
         if the user is an OIDC user."""
         is_oidc_user = await services.users.is_oidc_user(email)
@@ -197,8 +207,19 @@ class AuthHandler(Handler):
                 ]
             )
 
-        tokens = await services.external_oauth.get_callback(
+        callback_result = await services.external_oauth.get_callback(
             code=code, nonce=stored_nonce
+        )
+        tokens, user_id = (
+            callback_result.tokens,
+            callback_result.user_id,
+        )
+        session = await services.django_session.create_session(
+            user_id=user_id, expires_at=utcnow() + timedelta(minutes=10)
+        )
+        cookie_manager.set_unsafe_cookie("sessionid", session.session_key)
+        cookie_manager.set_unsafe_cookie(
+            "csrftoken", callback_result.csrf_token
         )
         cookie_manager.set_auth_cookie(
             value=tokens.access_token
@@ -265,7 +286,7 @@ class AuthHandler(Handler):
         self,
         pagination_params: PaginationParams = Depends(),  # noqa: B008
         services: ServiceCollectionV3 = Depends(services),  # noqa: B008
-    ):
+    ) -> OAuthProvidersListResponse:
         providers = await services.external_oauth.list(
             page=pagination_params.page, size=pagination_params.size
         )
@@ -402,6 +423,37 @@ class AuthHandler(Handler):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @handler(
+        path="/auth/sessions",
+        methods=["POST"],
+        tags=TAGS,
+        responses={204: {}},
+        status_code=204,
+    )
+    async def extend_session(
+        self,
+        services: ServiceCollectionV3 = Depends(services),  # noqa: B008
+        authenticated_user: AuthenticatedUser | None = Depends(  # noqa: B008
+            get_authenticated_user
+        ),
+        cookie_manager: EncryptedCookieManager = Depends(cookie_manager),  # noqa: B008
+    ) -> Response:
+        assert authenticated_user is not None
+        session_id = cookie_manager.get_unsafe_cookie(key="sessionid")
+        if not session_id:
+            raise UnauthorizedException(
+                details=[
+                    BaseExceptionDetail(
+                        type=INVALID_TOKEN_VIOLATION_TYPE,
+                        message="Session cookie is missing.",
+                    )
+                ]
+            )
+        await services.django_session.extend_session(
+            session_key=session_id, expires_at=utcnow() + timedelta(minutes=10)
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @handler(
         path="/auth/logout",
         methods=["POST"],
         tags=TAGS,
@@ -414,19 +466,26 @@ class AuthHandler(Handler):
         self,
         cookie_manager: EncryptedCookieManager = Depends(cookie_manager),  # noqa: B008
         services: ServiceCollectionV3 = Depends(services),  # noqa: B008
-    ):
-        id_token, refresh_token = (
+    ) -> Response:
+        id_token, refresh_token, session_key = (
             cookie_manager.get_cookie(key=MAASOAuth2Cookie.OAUTH2_ID_TOKEN),
             cookie_manager.get_cookie(
                 key=MAASOAuth2Cookie.OAUTH2_REFRESH_TOKEN
             ),
+            cookie_manager.get_unsafe_cookie(key="sessionid"),
         )
         if id_token and refresh_token:
             await services.external_oauth.revoke_token(
                 id_token=id_token, refresh_token=refresh_token
             )
+        if session_key:
+            await services.django_session.delete_session(
+                session_key=session_key
+            )
 
         cookie_manager.clear_cookie(key=MAASOAuth2Cookie.OAUTH2_ID_TOKEN)
         cookie_manager.clear_cookie(key=MAASOAuth2Cookie.OAUTH2_ACCESS_TOKEN)
         cookie_manager.clear_cookie(key=MAASOAuth2Cookie.OAUTH2_REFRESH_TOKEN)
+        cookie_manager.clear_cookie(key="sessionid")
+        cookie_manager.clear_cookie(key="csrftoken")
         return Response(status_code=204)

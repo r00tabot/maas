@@ -5,6 +5,7 @@ import base64
 from dataclasses import dataclass, field
 from datetime import timedelta
 import os
+import secrets
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from httpx import AsyncClient
@@ -104,6 +105,13 @@ class ExternalAuthServiceCache(ServiceCache):
             await self.rbac_client.close()
         if self.candid_client:
             await self.candid_client.close()
+
+
+@dataclass
+class OAuthCallbackResult:
+    tokens: OAuthTokenData
+    user_id: int
+    csrf_token: str
 
 
 # We need to implement RootKeyStore because we pass this service to the Macaroon Auth Checker
@@ -492,7 +500,7 @@ class ExternalOAuthService(
         metadata = response.json()
         return ProviderMetadata(**metadata)
 
-    async def get_callback(self, code: str, nonce: str) -> OAuthTokenData:
+    async def get_callback(self, code: str, nonce: str) -> OAuthCallbackResult:
         client = await self.get_client()
 
         data = await client.callback(code=code, nonce=nonce)
@@ -523,7 +531,10 @@ class ExternalOAuthService(
                 ),
             )
 
-        return data.tokens
+        csrf_token = secrets.token_urlsafe(32)
+        return OAuthCallbackResult(
+            tokens=data.tokens, user_id=user.id, csrf_token=csrf_token
+        )
 
     async def revoke_token(self, id_token: str, refresh_token: str) -> None:
         client = await self.get_client()

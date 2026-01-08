@@ -69,6 +69,7 @@ from maasservicelayer.services.external_auth import (
     ExternalAuthServiceCache,
     ExternalOAuthService,
     ExternalOAuthServiceCache,
+    OAuthCallbackResult,
 )
 from maasservicelayer.services.secrets import SecretNotFound
 from maasservicelayer.services.tokens import OIDCRevokedTokenService
@@ -1309,10 +1310,17 @@ class TestExternalOAuthService(ServiceCommonTests):
             ),
         )
         service_instance.users_service.update_profile.assert_not_called()
-        assert isinstance(data, OAuthTokenData)
-        assert data.id_token.encoded == "id_token_value"
-        assert data.access_token.encoded == "access_token_value"  # type: ignore
-        assert data.refresh_token == "refresh_token_value"
+        assert isinstance(data, OAuthCallbackResult)
+        tokens, user_id, csrf_token = (
+            data.tokens,
+            data.user_id,
+            data.csrf_token,
+        )
+        assert tokens.id_token.encoded == "id_token_value"
+        assert tokens.access_token.encoded == "access_token_value"  # type: ignore
+        assert tokens.refresh_token == "refresh_token_value"
+        assert csrf_token is not None
+        assert user_id == 1
 
     async def test_get_callback_newly_created_user(
         self,
@@ -1404,10 +1412,17 @@ class TestExternalOAuthService(ServiceCommonTests):
                 provider_id=test_instance.id,
             ),
         )
-        assert isinstance(data, OAuthTokenData)
-        assert data.id_token.encoded == "id_token_value"
-        assert data.access_token.encoded == "access_token_value"  # type: ignore
-        assert data.refresh_token == "refresh_token_value"
+        assert isinstance(data, OAuthCallbackResult)
+        tokens, user_id, csrf_token = (
+            data.tokens,
+            data.user_id,
+            data.csrf_token,
+        )
+        assert tokens.id_token.encoded == "id_token_value"
+        assert tokens.access_token.encoded == "access_token_value"  # type: ignore
+        assert tokens.refresh_token == "refresh_token_value"
+        assert csrf_token is not None
+        assert user_id == 1
 
     async def test_revoke_token(
         self,

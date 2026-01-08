@@ -1,7 +1,9 @@
 # Copyright 2024-2025 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+from dataclasses import dataclass
 import os
+import secrets
 
 import structlog
 
@@ -30,6 +32,13 @@ from maasservicelayer.services.users import UsersService
 logger = structlog.getLogger(__name__)
 
 
+@dataclass
+class LoginResult:
+    jwt: JWT
+    user_id: int
+    csrf_token: str
+
+
 class AuthService(Service):
     MAAS_V3_JWT_KEY_SECRET = V3JWTKeySecret()
     TOKEN_SECRET_KEY_BYTES = 32
@@ -47,7 +56,7 @@ class AuthService(Service):
         self.secrets_service = secrets_service
         self.users_service = users_service
 
-    async def login(self, username: str, password: str) -> JWT:
+    async def login(self, username: str, password: str) -> LoginResult:
         user = await self.users_service.get_one(
             QuerySpec(UserClauseFactory.with_username(username))
         )
@@ -75,7 +84,9 @@ class AuthService(Service):
             else [UserRole.USER]
         )
         jwt_key = await self._get_or_create_cached_jwt_key()
-        return JWT.create(jwt_key, user.username, user.id, roles)
+        jwt = JWT.create(jwt_key, user.username, user.id, roles)
+        csrf_token = secrets.token_urlsafe(32)
+        return LoginResult(jwt=jwt, user_id=user.id, csrf_token=csrf_token)
 
     async def access_token(self, authenticated_user: AuthenticatedUser) -> JWT:
         jwt_key = await self._get_or_create_cached_jwt_key()

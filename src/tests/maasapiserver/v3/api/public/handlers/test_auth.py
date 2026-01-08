@@ -1,6 +1,7 @@
 #  Copyright 2024 Canonical Ltd.  This software is licensed under the
 #  GNU Affero General Public License version 3 (see the file LICENSE).
 
+from datetime import timedelta
 from json import dumps as _dumps
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -49,15 +50,18 @@ from maasservicelayer.exceptions.constants import (
     UNIQUE_CONSTRAINT_VIOLATION_TYPE,
 )
 from maasservicelayer.models.base import ListResult
+from maasservicelayer.models.django_session import DjangoSession
 from maasservicelayer.models.external_auth import (
     OAuthProvider,
     ProviderMetadata,
 )
 from maasservicelayer.services import ServiceCollectionV3
-from maasservicelayer.services.auth import AuthService
+from maasservicelayer.services.auth import AuthService, LoginResult
+from maasservicelayer.services.django_session import DjangoSessionService
 from maasservicelayer.services.external_auth import (
     ExternalAuthService,
     ExternalOAuthService,
+    OAuthCallbackResult,
 )
 from maasservicelayer.services.users import UsersService
 from maasservicelayer.utils.date import utcnow
@@ -104,14 +108,30 @@ class TestAuthApi:
     BASE_PATH = f"{V3_API_PREFIX}/auth"
 
     # POST /auth/login
+    @patch(
+        "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.set_unsafe_cookie"
+    )
     async def test_post(
         self,
+        cookie_manager_set_unsafe_cookie: MagicMock,
         services_mock: ServiceCollectionV3,
         mocked_api_client: AsyncClient,
     ) -> None:
+        services_mock.external_oauth = Mock(ExternalOAuthService)
+        cookie_manager_set_unsafe_cookie.side_effect = None
         services_mock.auth = Mock(AuthService)
-        services_mock.auth.login.return_value = JWT.create(
-            "key", "username", 0, [UserRole.USER]
+        services_mock.django_session = Mock(DjangoSessionService)
+        services_mock.auth.login.return_value = LoginResult(
+            jwt=JWT.create("key", "username", 0, [UserRole.USER]),
+            user_id=0,
+            csrf_token="csrf123",
+        )
+        services_mock.django_session.create_session.return_value = (
+            DjangoSession(
+                session_key="sessionid123",
+                session_data="data",
+                expire_date=utcnow(),
+            )
         )
         response = await mocked_api_client.post(
             f"{self.BASE_PATH}/login",
@@ -125,6 +145,12 @@ class TestAuthApi:
             jwt.get_unverified_claims(token_response.access_token)["sub"]
             == "username"
         )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "sessionid", "sessionid123"
+        )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "csrftoken", "csrf123"
+        )
 
     async def test_post_validation_failed(
         self,
@@ -132,6 +158,7 @@ class TestAuthApi:
         mocked_api_client: AsyncClient,
     ) -> None:
         services_mock.auth = Mock(AuthService)
+        services_mock.external_oauth = Mock(ExternalOAuthService)
         services_mock.auth.login.side_effect = RequestValidationError(
             errors=[]
         )
@@ -147,6 +174,7 @@ class TestAuthApi:
         mocked_api_client_user_rbac: AsyncClient,
     ) -> None:
         services_mock.external_auth = Mock(ExternalAuthService)
+        services_mock.external_oauth = Mock(ExternalOAuthService)
         services_mock.external_auth.raise_discharge_required_exception.side_effect = DischargeRequiredException(
             macaroon=Mock(Macaroon)
         )
@@ -171,6 +199,7 @@ class TestAuthApi:
         services_mock: ServiceCollectionV3,
         mocked_api_client: AsyncClient,
     ) -> None:
+        services_mock.external_oauth = Mock(ExternalOAuthService)
         services_mock.auth = Mock(AuthService)
         services_mock.auth.login.side_effect = UnauthorizedException(
             details=[
@@ -787,25 +816,44 @@ class TestAuthApi:
     @patch(
         "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.get_cookie"
     )
+    @patch(
+        "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.set_unsafe_cookie"
+    )
     async def test_handle_oauth_callback_success_when_access_token_is_string(
         self,
+        cookie_manager_set_unsafe_cookie: MagicMock,
         cookie_manager_get_cookie: MagicMock,
         cookie_manager_set_auth_cookie: MagicMock,
         services_mock: ServiceCollectionV3,
         mocked_api_client: AsyncClient,
     ) -> None:
+        cookie_manager_set_unsafe_cookie.return_value = None
         cookie_manager_get_cookie.side_effect = [
             "stored_state",
             "stored_nonce",
         ]
         services_mock.external_oauth = Mock(ExternalOAuthService)
+        services_mock.django_session = Mock(DjangoSessionService)
         services_mock.external_oauth.get_callback.return_value = (
-            OAuthTokenData(
-                access_token="abc123",
-                id_token=OAuthIDToken(
-                    claims=Mock(), encoded="def123", provider=TEST_PROVIDER_1
+            OAuthCallbackResult(
+                user_id=1,
+                csrf_token="csrf123",
+                tokens=OAuthTokenData(
+                    access_token="abc123",
+                    id_token=OAuthIDToken(
+                        claims=Mock(),
+                        encoded="def123",
+                        provider=TEST_PROVIDER_1,
+                    ),
+                    refresh_token="ghi123",
                 ),
-                refresh_token="ghi123",
+            )
+        )
+        services_mock.django_session.create_session.return_value = (
+            DjangoSession(
+                session_key="sessionid123",
+                session_data="data",
+                expire_date=utcnow(),
             )
         )
 
@@ -815,6 +863,12 @@ class TestAuthApi:
         assert response.status_code == 204
         services_mock.external_oauth.get_callback.assert_called_once_with(
             code="auth_code", nonce="stored_nonce"
+        )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "sessionid", "sessionid123"
+        )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "csrftoken", "csrf123"
         )
         cookie_manager_set_auth_cookie.assert_any_call(
             key=MAASOAuth2Cookie.OAUTH2_ACCESS_TOKEN, value="abc123"
@@ -832,8 +886,12 @@ class TestAuthApi:
     @patch(
         "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.get_cookie"
     )
+    @patch(
+        "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.set_unsafe_cookie"
+    )
     async def test_handle_oauth_callback_success_when_access_token_is_not_string(
         self,
+        cookie_manager_set_unsafe_cookie: MagicMock,
         cookie_manager_get_cookie: MagicMock,
         cookie_manager_set_auth_cookie: MagicMock,
         services_mock: ServiceCollectionV3,
@@ -844,15 +902,31 @@ class TestAuthApi:
             "stored_nonce",
         ]
         services_mock.external_oauth = Mock(ExternalOAuthService)
+        services_mock.django_session = Mock(DjangoSessionService)
         services_mock.external_oauth.get_callback.return_value = (
-            OAuthTokenData(
-                access_token=OAuthAccessToken(
-                    claims=Mock(), encoded="abc123", provider=TEST_PROVIDER_1
+            OAuthCallbackResult(
+                user_id=1,
+                csrf_token="csrf123",
+                tokens=OAuthTokenData(
+                    access_token=OAuthAccessToken(
+                        claims=Mock(),
+                        encoded="abc123",
+                        provider=TEST_PROVIDER_1,
+                    ),
+                    id_token=OAuthIDToken(
+                        claims=Mock(),
+                        encoded="def123",
+                        provider=TEST_PROVIDER_1,
+                    ),
+                    refresh_token="ghi123",
                 ),
-                id_token=OAuthIDToken(
-                    claims=Mock(), encoded="def123", provider=TEST_PROVIDER_1
-                ),
-                refresh_token="ghi123",
+            )
+        )
+        services_mock.django_session.create_session.return_value = (
+            DjangoSession(
+                session_key="sessionid123",
+                session_data="data",
+                expire_date=utcnow(),
             )
         )
 
@@ -862,6 +936,12 @@ class TestAuthApi:
         assert response.status_code == 204
         services_mock.external_oauth.get_callback.assert_called_once_with(
             code="auth_code", nonce="stored_nonce"
+        )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "sessionid", "sessionid123"
+        )
+        cookie_manager_set_unsafe_cookie.assert_any_call(
+            "csrftoken", "csrf123"
         )
         cookie_manager_set_auth_cookie.assert_any_call(
             key=MAASOAuth2Cookie.OAUTH2_ACCESS_TOKEN, value="abc123"
@@ -909,16 +989,29 @@ class TestAuthApi:
     @patch(
         "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.get_cookie"
     )
+    @patch(
+        "maasapiserver.v3.api.public.handlers.auth.EncryptedCookieManager.get_unsafe_cookie"
+    )
     async def test_get_logout_success(
         self,
+        cookie_manager_get_unsafe_cookie: MagicMock,
         cookie_manager_get_cookie: MagicMock,
         cookie_manager_clear_cookie: MagicMock,
         services_mock: ServiceCollectionV3,
         mocked_api_client: AsyncClient,
     ) -> None:
         services_mock.external_oauth = Mock(ExternalOAuthService)
+        services_mock.django_session = Mock(DjangoSessionService)
+        services_mock.django_session.delete_session.return_value = None
+        cookie_manager_get_unsafe_cookie.return_value = "sessionid123"
         cookie_manager_get_cookie.side_effect = ["abc123", "def123"]
-        cookie_manager_clear_cookie.side_effect = [None, None, None]
+        cookie_manager_clear_cookie.side_effect = [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
         services_mock.external_oauth.revoke_token = AsyncMock(
             return_value=None
         )
@@ -934,7 +1027,49 @@ class TestAuthApi:
         cookie_manager_clear_cookie.assert_any_call(
             key=MAASOAuth2Cookie.OAUTH2_REFRESH_TOKEN
         )
+        cookie_manager_clear_cookie.assert_any_call(key="sessionid")
+        cookie_manager_clear_cookie.assert_any_call(key="csrftoken")
         services_mock.external_oauth.revoke_token.assert_awaited_once_with(
             id_token="abc123", refresh_token="def123"
         )
         assert response.status_code == 204
+
+    @patch("maasapiserver.v3.api.public.handlers.auth.utcnow")
+    async def test_post_extend_session_204(
+        self,
+        utcnow_mock: MagicMock,
+        services_mock: ServiceCollectionV3,
+        mocked_api_client_user: AsyncClient,
+    ):
+        services_mock.external_oauth = Mock(ExternalOAuthService)
+        utcnow_mock.return_value = utcnow()
+        services_mock.django_session = Mock(DjangoSessionService)
+        services_mock.django_session.extend_session.return_value = None
+        response = await mocked_api_client_user.post(
+            f"{self.BASE_PATH}/sessions",
+            cookies={"sessionid": "sessionid123"},
+        )
+        assert response.status_code == 204
+        services_mock.django_session.extend_session.assert_awaited_once_with(
+            session_key="sessionid123",
+            expires_at=utcnow_mock.return_value + timedelta(minutes=10),
+        )
+
+    async def test_post_extend_session_401(
+        self,
+        services_mock: ServiceCollectionV3,
+        mocked_api_client_user: AsyncClient,
+    ):
+        services_mock.external_oauth = Mock(ExternalOAuthService)
+        services_mock.django_session = Mock(DjangoSessionService)
+        services_mock.django_session.extend_session.return_value = None
+        response = await mocked_api_client_user.post(
+            f"{self.BASE_PATH}/sessions",
+        )
+        assert response.status_code == 401
+        error_response = ErrorBodyResponse(**response.json())
+        assert error_response.kind == "Error"
+        details = error_response.details
+        assert details is not None
+        assert details[0].type == INVALID_TOKEN_VIOLATION_TYPE
+        assert details[0].message == "Session cookie is missing."
