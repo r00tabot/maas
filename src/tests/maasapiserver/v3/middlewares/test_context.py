@@ -9,6 +9,7 @@ import pytest
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
+from maasapiserver.v3.auth.cookie_manager import MAASLocalCookie
 from maasapiserver.v3.middlewares.context import (
     ContextMiddleware,
     TRACE_ID_HEADER_KEY,
@@ -104,3 +105,18 @@ class TestContextMiddleware:
         assert "status_code" in end_call.kwargs
         assert end_call.kwargs["status_code"] == 200
         assert "elapsed_time_seconds" in end_call.kwargs
+
+    async def test_jwt_cookie_set_if_new_token_generated(self, app):
+        @app.get("/set-jwt")
+        async def set_jwt(request: Request):
+            request.state.new_jwt_token = "new-jwt-token-value"
+            return JSONResponse({"message": "JWT set"})
+
+        client = TestClient(app)
+        resp = client.get("/set-jwt")
+
+        assert resp.status_code == 200
+        assert (
+            resp.cookies.get(MAASLocalCookie.JWT_TOKEN)
+            == "new-jwt-token-value"
+        )

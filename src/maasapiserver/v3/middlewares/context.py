@@ -9,6 +9,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 import structlog
 
+from maasapiserver.v3.auth.cookie_manager import MAASLocalCookie
 from maascommon.tracing import get_or_set_trace_id, set_trace_id
 from maasservicelayer.context import Context
 
@@ -50,6 +51,15 @@ class ContextMiddleware(BaseHTTPMiddleware):
             useragent=request.headers.get("user-agent"),
         )
         response = await call_next(request)
+
+        # Check if new local JWT token was generated during request processing
+        new_jwt = getattr(request.state, "new_jwt_token", None)
+        if new_jwt:
+            response.set_cookie(
+                key=MAASLocalCookie.JWT_TOKEN,
+                value=new_jwt,
+            )
+
         logger.info(
             "End processing request",
             status_code=response.status_code,
