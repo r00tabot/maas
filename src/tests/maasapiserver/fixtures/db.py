@@ -1,3 +1,6 @@
+# Copyright 2023-2026 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
 from contextlib import asynccontextmanager
 from os.path import abspath
 import random
@@ -59,6 +62,7 @@ async def db_connection(
     conn = await db.engine.connect()
     if allow_transactions:
         try:
+            await conn.begin()
             yield conn
         finally:
             await conn.close()

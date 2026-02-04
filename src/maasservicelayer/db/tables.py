@@ -24,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, INET, JSONB, OID
+from sqlalchemy.sql.schema import PrimaryKeyConstraint
 
 METADATA = MetaData()
 
@@ -37,6 +38,7 @@ METADATA = MetaData()
 # To avoid this, we manually assign Django-compatible names to indexes when
 # needed.
 
+OPENFGA_SCHEMA = "openfga"
 
 # Keep them in alphabetical order!
 
@@ -1713,6 +1715,29 @@ OIDCRevokedTokenTable = Table(
     Index("maasserver_oidcrevokedtoken_provider_id_3d1f3f6b", "provider_id"),
 )
 
+OpenFGATupleTable = Table(
+    "tuple",
+    METADATA,
+    Column("store", Text, nullable=False),
+    Column("object_type", Text, nullable=False),
+    Column("object_id", Text, nullable=False),
+    Column("relation", Text, nullable=False),
+    Column("_user", Text, nullable=False),
+    Column("user_type", Text, nullable=False),
+    Column("ulid", Text, nullable=False),
+    Column("inserted_at", DateTime(timezone=True), nullable=False),
+    Column("condition_name", Text, nullable=True),
+    Column("condition_context", LargeBinary, nullable=True),
+    PrimaryKeyConstraint(
+        "store",
+        "object_type",
+        "object_id",
+        "relation",
+        "_user",
+        name="tuple_pkey",
+    ),
+    schema=OPENFGA_SCHEMA,
+)
 
 PackageRepositoryTable = Table(
     "maasserver_packagerepository",
