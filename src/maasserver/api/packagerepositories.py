@@ -5,7 +5,10 @@
 from piston3.utils import rc
 
 from maascommon.logging.security import CREATED, DELETED
-from maasserver.api.support import admin_method, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    OperationsHandler,
+)
 from maasserver.audit import create_audit_event
 from maasserver.enum import ENDPOINT
 from maasserver.exceptions import MAASAPIValidationError
@@ -69,7 +72,7 @@ class PackageRepositoryHandler(OperationsHandler):
         """
         return PackageRepository.objects.get_object_or_404(id)
 
-    @admin_method
+    @admin_write_global_entities_method
     def update(self, request, id):
         """@description-title Update a package repository
         @description Update the package repository with the given id.
@@ -128,7 +131,7 @@ class PackageRepositoryHandler(OperationsHandler):
         else:
             raise MAASAPIValidationError(form.errors)
 
-    @admin_method
+    @admin_write_global_entities_method
     def delete(self, request, id):
         """@description-title Delete a package repository
         @description Delete a package repository with the given id.
@@ -181,7 +184,7 @@ class PackageRepositoriesHandler(OperationsHandler):
         """
         return PackageRepository.objects.all()
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description-title Create a package repository
         @description Create a new package repository.

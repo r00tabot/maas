@@ -6,7 +6,10 @@
 from django.db.models.query import QuerySet
 from piston3.utils import rc
 
-from maasserver.api.support import admin_method, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    OperationsHandler,
+)
 from maasserver.exceptions import MAASAPIBadRequest, MAASAPIValidationError
 from maasserver.forms.space import SpaceForm
 from maasserver.models import Space, Subnet, VLAN
@@ -76,7 +79,7 @@ class SpacesHandler(OperationsHandler):
         spaces_query.__class__ = SpacesQuerySet
         return spaces_query
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description-title Create a space
         @description Create a new space.

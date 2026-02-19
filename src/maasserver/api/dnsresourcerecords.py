@@ -5,7 +5,10 @@
 
 from piston3.utils import rc
 
-from maasserver.api.support import admin_method, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    OperationsHandler,
+)
 from maasserver.exceptions import MAASAPIBadRequest, MAASAPIValidationError
 from maasserver.forms.dnsdata import DNSDataForm
 from maasserver.forms.dnsresource import DNSResourceForm
@@ -83,7 +86,7 @@ class DNSResourceRecordsHandler(OperationsHandler):
             query = query.filter(rrtype=rrtype)
         return query
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description-title Create a DNS resource record
         @description Create a new DNS resource record.

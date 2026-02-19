@@ -4,7 +4,7 @@
 """API handlers: `Zone`."""
 
 from maasserver.api.support import (
-    admin_method,
+    admin_write_global_entities_method,
     AnonymousOperationsHandler,
     ModelCollectionOperationsHandler,
     ModelOperationsHandler,
@@ -126,7 +126,7 @@ class ZonesHandler(ModelCollectionOperationsHandler):
     handler_url_name = "zones_handler"
     api_doc_section_name = "Zones"
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description Creates a new zone.
         @param (string) "name" [required=true] The new zone's name.

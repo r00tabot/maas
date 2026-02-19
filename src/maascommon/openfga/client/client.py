@@ -16,10 +16,13 @@ from maascommon.path import get_maas_data_path
 class OpenFGAClient:
     """Client for interacting with OpenFGA API."""
 
-    HEADERS = {"User-Agent": "maas-openfga-client/1.0"}
+    HEADERS = {"User-Agent": "maas-get_openfga_client()/1.0"}
 
     def __init__(self, unix_socket: str | None = None):
         self.client = self._create_client(unix_socket)
+
+    async def close(self):
+        await self.client.aclose()
 
     def _create_client(
         self, unix_socket: str | None = None
@@ -55,23 +58,15 @@ class OpenFGAClient:
         data = response.json()
         return data.get("allowed", False)
 
-    async def can_edit_pools(self, user_id: str):
+    async def can_edit_machines(self, user_id: str):
         tuple_key = {
             "user": f"user:{user_id}",
-            "relation": "can_edit_pools",
-            "object": "maas:0",
+            "relation": "can_edit_machines",
+            "object": f"maas:0",
         }
         return await self._check(tuple_key)
 
-    async def can_view_pools(self, user_id: str):
-        tuple_key = {
-            "user": f"user:{user_id}",
-            "relation": "can_view_pools",
-            "object": "maas:0",
-        }
-        return await self._check(tuple_key)
-
-    async def can_edit_machines(self, user_id: str, pool_id: str):
+    async def can_edit_machines_in_pool(self, user_id: str, pool_id: str):
         tuple_key = {
             "user": f"user:{user_id}",
             "relation": "can_edit_machines",
@@ -79,7 +74,7 @@ class OpenFGAClient:
         }
         return await self._check(tuple_key)
 
-    async def can_deploy_machines(self, user_id: str, pool_id: str):
+    async def can_deploy_machines_in_pool(self, user_id: str, pool_id: str):
         tuple_key = {
             "user": f"user:{user_id}",
             "relation": "can_deploy_machines",
@@ -87,10 +82,20 @@ class OpenFGAClient:
         }
         return await self._check(tuple_key)
 
-    async def can_view_machines(self, user_id: str, pool_id: str):
+    async def can_view_machines_in_pool(self, user_id: str, pool_id: str):
         tuple_key = {
             "user": f"user:{user_id}",
             "relation": "can_view_machines",
+            "object": f"pool:{pool_id}",
+        }
+        return await self._check(tuple_key)
+
+    async def can_view_available_machines_in_pool(
+        self, user_id: str, pool_id: str
+    ):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_view_available_machines",
             "object": f"pool:{pool_id}",
         }
         return await self._check(tuple_key)
@@ -107,6 +112,22 @@ class OpenFGAClient:
         tuple_key = {
             "user": f"user:{user_id}",
             "relation": "can_edit_global_entities",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def can_view_controllers(self, user_id: str):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_view_controllers",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def can_edit_controllers(self, user_id):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_edit_controllers",
             "object": "maas:0",
         }
         return await self._check(tuple_key)
@@ -142,3 +163,52 @@ class OpenFGAClient:
             "object": "maas:0",
         }
         return await self._check(tuple_key)
+
+    async def can_edit_notifications(self, user_id):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_edit_notifications",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def can_view_notifications(self, user_id: str):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_view_notifications",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def can_view_devices(self, user_id: str):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_view_devices",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def can_view_ipaddresses(self, user_id: str):
+        tuple_key = {
+            "user": f"user:{user_id}",
+            "relation": "can_view_ipaddresses",
+            "object": "maas:0",
+        }
+        return await self._check(tuple_key)
+
+    async def list_visible_pools(self, user_id: str) -> set[str]:
+        response = await self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/list-objects",
+            json={
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+                "user": f"user:{user_id}",
+                "relation": "can_view",
+                "type": "pool",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        pools = set()
+        for item in data.get("objects", []):
+            pools.add(item.split(":")[1])
+        return pools

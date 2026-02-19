@@ -5,7 +5,10 @@
 
 from piston3.utils import rc
 
-from maasserver.api.support import admin_method, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    OperationsHandler,
+)
 from maasserver.exceptions import MAASAPIValidationError
 from maasserver.forms.vmcluster import DeleteVMClusterForm, UpdateVMClusterForm
 from maasserver.models import VMCluster
@@ -99,7 +102,7 @@ class VmClusterHandler(OperationsHandler):
             for n, p in pools.items()
         }
 
-    @admin_method
+    @admin_write_global_entities_method
     def update(self, request, *args, **kwargs):
         """@description-title Update VMCluster
         @description Update a specific VMCluster by ID.
@@ -132,7 +135,7 @@ class VmClusterHandler(OperationsHandler):
 
         return cluster
 
-    @admin_method
+    @admin_write_global_entities_method
     def delete(self, request, *args, **kwargs):
         """@description-title Deletes a VM cluster
         @description Deletes a VM cluster with the given ID.

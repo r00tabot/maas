@@ -1,4 +1,4 @@
-# Copyright 2013-2019 Canonical Ltd.  This software is licensed under the
+# Copyright 2013-2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """Helpers for API testing."""
@@ -17,9 +17,11 @@ import unittest
 from django.contrib.auth.models import AnonymousUser
 from testscenarios import multiply_scenarios
 
+from maasserver import openfga as openfga_module
 from maasserver.macaroon_auth import external_auth_enabled
 from maasserver.models.user import create_auth_token
 from maasserver.testing.factory import factory
+from maasserver.testing.openfga import OpenFGAClientMock
 from maasserver.testing.testcase import (
     MAASServerTestCase,
     MAASTransactionServerTestCase,
@@ -174,6 +176,10 @@ class APITestCaseBase(MAASTestCase, metaclass=APITestType):
         self.user = self.userfactory()
         self.client = self.clientfactory()
         self.client.login(user=self.user)
+
+        self.openfga_mock = OpenFGAClientMock()
+        mock_client = self.patch(openfga_module, "_get_client")
+        mock_client.return_value = self.openfga_mock
 
     def assertIsInstance(self, *args, **kwargs):
         return unittest.TestCase.assertIsInstance(self, *args, **kwargs)

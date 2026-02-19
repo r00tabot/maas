@@ -9,6 +9,7 @@ from maasserver.enum import NODE_STATUS, NODE_TYPE, SIMPLIFIED_NODE_STATUS
 from maasserver.rbac import rbac
 from maasserver.storage_layouts import MIN_BOOT_PARTITION_SIZE
 from maasserver.testing.factory import factory
+from maasserver.testing.openfga import OpenFGAClientMock
 from maasserver.websockets.base import HandlerValidationError
 from maasserver.websockets.handlers.machine import MachineHandler
 from maasserver.websockets.handlers.tests.test_machine import (
@@ -34,7 +35,15 @@ def force_rbac_off():
     rbac._get_rbac_url = orig_get_url
 
 
+@pytest.fixture
+def mock_openfga(mocker):
+    openfga_mock = OpenFGAClientMock()
+    mocker.patch("maasserver.openfga._get_client", return_value=openfga_mock)
+    yield
+
+
 @pytest.mark.usefixtures("maasdb")
+@pytest.mark.usefixtures("mock_openfga")
 class TestMachineHandler:
     maxDiff = None
 

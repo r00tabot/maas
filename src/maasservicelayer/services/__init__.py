@@ -728,5 +728,9 @@ class ServiceCollectionV3:
         services.openfga_tuples = OpenFGATupleService(
             context=context,
             openfga_tuple_repository=OpenFGATuplesRepository(context),
+            cache=cache.get(
+                OpenFGATupleService.__name__,
+                OpenFGATupleService.build_cache_object,
+            ),  # type: ignore
         )
         return services

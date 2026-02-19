@@ -1,4 +1,4 @@
-# Copyright 2017-2020 Canonical Ltd.  This software is licensed under the
+# Copyright 2017-2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """The Pod handler for the WebSocket connection."""
@@ -8,6 +8,7 @@ import dataclasses
 import attr
 from django.http import HttpRequest
 
+from maasserver.authorization import can_view_configurations
 from maasserver.clusterrpc.pods import (
     discover_pod_projects,
     get_best_discovered_result,
@@ -117,7 +118,7 @@ class PodHandler(TimestampedModelHandler):
                 "resources": self.dehydrate_resources(obj, for_list=for_list),
             }
         )
-        if self.user.is_superuser:
+        if can_view_configurations(self.user):
             data["power_parameters"] = obj.get_power_parameters()
         if not for_list:
             if obj.host:

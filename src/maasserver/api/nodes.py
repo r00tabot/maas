@@ -18,7 +18,7 @@ from piston3.utils import rc
 
 from maascommon.fields import MAC_FIELD_RE, normalise_macaddress
 from maasserver.api.support import (
-    admin_method,
+    admin_write_global_entities_method,
     AnonymousOperationsHandler,
     deprecated,
     operation,
@@ -1280,7 +1280,7 @@ class PowerMixin:
 class PowersMixin:
     """Mixin which adds power commands to a nodes type."""
 
-    @admin_method
+    @admin_write_global_entities_method
     @operation(idempotent=True)
     def power_parameters(self, request):
         """@description-title Get power parameters

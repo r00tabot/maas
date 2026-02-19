@@ -1,4 +1,4 @@
-# Copyright 2012-2025 Canonical Ltd.  This software is licensed under the
+# Copyright 2012-2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """Custom test-case classes."""
@@ -28,6 +28,7 @@ from django.db import (
 from django.db.utils import IntegrityError, OperationalError
 
 from maasserver import bootsources as bootsources_module
+from maasserver import openfga as openfga_module
 from maasserver.models import dhcpsnippet as snippet_module
 from maasserver.models import interface as interface_module
 from maasserver.models import iprange as iprange_module
@@ -41,6 +42,7 @@ from maasserver.testing.fixtures import (
     PackageRepositoryFixture,
     RBACClearFixture,
 )
+from maasserver.testing.openfga import OpenFGAClientMock
 from maasserver.testing.orm import PostCommitHooksTestMixin
 from maasserver.testing.resources import DjangoDatabasesManager
 from maasserver.testing.testclient import MAASSensibleClient
@@ -103,6 +105,10 @@ class MAASRegionTestCaseBase(PostCommitHooksTestMixin):
 
         if self.mock_cache_boot_source:
             self.patch(bootsources_module, "post_commit_do")
+
+        self.openfga_mock = OpenFGAClientMock()
+        mock_client = self.patch(openfga_module, "_get_client")
+        mock_client.return_value = self.openfga_mock
 
     def setUpFixtures(self):
         """This should be called by a subclass once other set-up is done."""

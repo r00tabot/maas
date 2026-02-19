@@ -7,7 +7,11 @@ from formencode.validators import StringBool
 from piston3.utils import rc
 
 from maascommon.utils.network import IPRangeStatistics
-from maasserver.api.support import admin_method, operation, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    operation,
+    OperationsHandler,
+)
 from maasserver.api.utils import get_optional_param
 from maasserver.exceptions import MAASAPIValidationError
 from maasserver.forms.subnet import SubnetForm
@@ -55,7 +59,7 @@ class SubnetsHandler(OperationsHandler):
         """
         return Subnet.objects.all()
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description-title Create a subnet
         @description Creates a new subnet.

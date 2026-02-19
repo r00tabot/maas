@@ -1,0 +1,284 @@
+# Copyright 2026 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
+
+import os
+from pathlib import Path
+
+from django.contrib.auth.models import User
+import httpx
+
+from maascommon.enums.openfga import (
+    OPENFGA_AUTHORIZATION_MODEL_ID,
+    OPENFGA_STORE_ID,
+)
+from maascommon.path import get_maas_data_path
+
+
+class SyncOpenFGAClient:
+    """Synchronous client for interacting with OpenFGA API (Django-safe)."""
+
+    HEADERS = {"User-Agent": "maas-get_openfga_client()/1.0"}
+
+    def __init__(self, unix_socket: str | None = None):
+        self.client = self._create_client(unix_socket)
+
+    def close(self):
+        self.client.close()
+
+    def _create_client(self, unix_socket: str | None = None) -> httpx.Client:
+        if unix_socket is None:
+            unix_socket = str(self._openfga_service_socket_path())
+
+        transport = httpx.HTTPTransport(uds=unix_socket)
+
+        return httpx.Client(
+            timeout=httpx.Timeout(10),
+            headers=self.HEADERS,
+            base_url="http://unix/",
+            transport=transport,
+        )
+
+    def _openfga_service_socket_path(self) -> Path:
+        return Path(
+            os.getenv(
+                "MAAS_OPENFGA_HTTP_SOCKET_PATH",
+                get_maas_data_path("openfga-http.sock"),
+            )
+        )
+
+    def _check(self, tuple_key: dict) -> bool:
+        response = self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/check",
+            json={
+                "tuple_key": tuple_key,
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("allowed", False)
+
+    def can_edit_machines(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_machines",
+                "object": f"maas:0",
+            }
+        )
+
+    def can_edit_machines_in_pool(self, user: User, pool_id: str) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_machines",
+                "object": f"pool:{pool_id}",
+            }
+        )
+
+    def can_deploy_machines_in_pool(self, user: User, pool_id: str) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_deploy_machines",
+                "object": f"pool:{pool_id}",
+            }
+        )
+
+    def can_view_machines_in_pool(self, user: User, pool_id: str) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_machines",
+                "object": f"pool:{pool_id}",
+            }
+        )
+
+    def can_view_available_machines_in_pool(
+        self, user: User, pool_id: str
+    ) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_available_machines",
+                "object": f"pool:{pool_id}",
+            }
+        )
+
+    def can_view_global_entities(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_global_entities",
+                "object": "maas:0",
+            }
+        )
+
+    def can_edit_global_entities(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_global_entities",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_controllers(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_controllers",
+                "object": "maas:0",
+            }
+        )
+
+    def can_edit_controllers(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_controllers",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_permissions(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_permissions",
+                "object": "maas:0",
+            }
+        )
+
+    def can_edit_permissions(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_permissions",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_configurations(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_configurations",
+                "object": "maas:0",
+            }
+        )
+
+    def can_edit_configurations(self, user: User) -> bool:
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_configurations",
+                "object": "maas:0",
+            }
+        )
+
+    def can_edit_notifications(self, user: User):
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_edit_notifications",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_notifications(self, user: User):
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_notifications",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_devices(self, user: User):
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_devices",
+                "object": "maas:0",
+            }
+        )
+
+    def can_view_ipaddresses(self, user: User):
+        return self._check(
+            {
+                "user": f"user:{user.id}",
+                "relation": "can_view_ipaddresses",
+                "object": "maas:0",
+            }
+        )
+
+    def list_pools_with_view_machines_access(self, user: User) -> list[str]:
+        response = self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/list-objects",
+            json={
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+                "user": f"user:{user.id}",
+                "relation": "can_view_machines",
+                "type": "pool",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        pools = []
+        for item in data.get("objects", []):
+            pools.append(item.split(":")[1])
+        return pools
+
+    def list_pools_with_view_deployable_machines_access(
+        self, user: User
+    ) -> list[str]:
+        response = self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/list-objects",
+            json={
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+                "user": f"user:{user.id}",
+                "relation": "can_view_available_machines",
+                "type": "pool",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        pools = []
+        for item in data.get("objects", []):
+            pools.append(item.split(":")[1])
+        return pools
+
+    def list_pool_with_deploy_machines_access(self, user: User) -> list[str]:
+        response = self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/list-objects",
+            json={
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+                "user": f"user:{user.id}",
+                "relation": "can_deploy_machines",
+                "type": "pool",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        pools = []
+        for item in data.get("objects", []):
+            pools.append(item.split(":")[1])
+        return pools
+
+    def list_pools_with_edit_machines_access(self, user: User) -> list[str]:
+        response = self.client.post(
+            f"/stores/{OPENFGA_STORE_ID}/list-objects",
+            json={
+                "authorization_model_id": OPENFGA_AUTHORIZATION_MODEL_ID,
+                "user": f"user:{user.id}",
+                "relation": "can_edit_machines",
+                "type": "pool",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        pools = []
+        for item in data.get("objects", []):
+            pools.append(item.split(":")[1])
+        return pools

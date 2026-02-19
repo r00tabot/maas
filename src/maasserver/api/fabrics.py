@@ -5,7 +5,10 @@
 
 from piston3.utils import rc
 
-from maasserver.api.support import admin_method, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    OperationsHandler,
+)
 from maasserver.exceptions import MAASAPIValidationError
 from maasserver.forms.fabric import FabricForm
 from maasserver.models import Fabric
@@ -49,7 +52,7 @@ class FabricsHandler(OperationsHandler):
         """
         return prefetch_queryset(Fabric.objects.all(), FABRIC_PREFETCH)
 
-    @admin_method
+    @admin_write_global_entities_method
     def create(self, request):
         """@description-title Create a fabric
         @description Create a fabric.

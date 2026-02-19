@@ -1,4 +1,4 @@
-# Copyright 2013-2018 Canonical Ltd.  This software is licensed under the
+# Copyright 2013-2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """Tests for the nodes API."""
@@ -11,6 +11,7 @@ from django.conf import settings
 from django.http import QueryDict
 from django.urls import reverse
 
+from maasserver import openfga as openfga_module
 from maasserver.api import auth
 from maasserver.api import nodes as nodes_module
 from maasserver.api.utils import get_overridden_query_dict
@@ -25,6 +26,7 @@ from maasserver.exceptions import MAASAPIValidationError
 from maasserver.testing.api import APITestCase
 from maasserver.testing.factory import factory
 from maasserver.testing.fixtures import RBACEnabled
+from maasserver.testing.openfga import OpenFGAClientMock
 from maasserver.utils.orm import reload_object
 
 

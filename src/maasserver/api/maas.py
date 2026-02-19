@@ -9,7 +9,11 @@ from django.http import HttpResponse
 from formencode import validators
 from piston3.utils import rc
 
-from maasserver.api.support import admin_method, operation, OperationsHandler
+from maasserver.api.support import (
+    admin_write_global_entities_method,
+    operation,
+    OperationsHandler,
+)
 from maasserver.api.utils import get_mandatory_param
 from maasserver.enum import ENDPOINT
 from maasserver.exceptions import MAASAPIValidationError
@@ -67,7 +71,7 @@ class MaasHandler(OperationsHandler):
     api_doc_section_name = "MAAS server"
     create = read = update = delete = None
 
-    @admin_method
+    @admin_write_global_entities_method
     @operation(idempotent=False)
     def set_config(self, request):
         """@description-title Set a configuration value
