@@ -114,6 +114,26 @@ func createPools(ctx context.Context, tx *sql.Tx) error {
 func createGroup(ctx context.Context, tx *sql.Tx, groupName string, relations *[]string) error {
 	builder := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
+	selectStmt, selectArgs, err := builder.
+		Select("id").
+		From("maasserver_usergroup").
+		Where(sq.Eq{"name": groupName}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	// Get the group ID if it already exists, otherwise panic. The maasserver migrations are supposed to be executed first,
+	// so we can assume that the groups already exist.
+	var groupID int64
+	err = tx.QueryRowContext(ctx, selectStmt, selectArgs...).Scan(&groupID)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("group '%s' does not exist", groupName)
+		}
+	}
+
 	for _, relation := range *relations {
 		userGroupStmt, userGroupArgs, err := builder.
 			Insert("openfga.tuple").
@@ -129,7 +149,7 @@ func createGroup(ctx context.Context, tx *sql.Tx, groupName string, relations *[
 			).
 			Values(
 				storeID,
-				fmt.Sprintf("group:%s#member", groupName),
+				fmt.Sprintf("group:%d#member", groupID),
 				"userset",
 				relation,
 				"maas",
