@@ -597,7 +597,6 @@ class TestControllerHandlerOpenFGAIntegration(
 ):
     def test_register_info_requires_can_edit_controllers(self):
         self.openfga_client.can_edit_controllers.return_value = True
-        SecretManager().set_simple_secret("rpc-shared", "abc")
         user = factory.make_User()
         handler = ControllerHandler(user, {}, None)
         handler.register_info({})
