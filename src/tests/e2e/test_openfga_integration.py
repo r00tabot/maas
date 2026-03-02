@@ -30,97 +30,93 @@ class TestIntegrationConfigurationsService:
 
         # team A can edit and view everything
         await services.openfga_tuples.create(
-            OpenFGATupleBuilder.build_group_can_edit_machines(group_id="teamA")
+            OpenFGATupleBuilder.build_group_can_edit_machines(group_id=1000)
         )
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_global_entities(
-                group_id="teamA"
+                group_id=1000
             )
         )
         await services.openfga_tuples.create(
-            OpenFGATupleBuilder.build_group_can_edit_controllers(
-                group_id="teamA"
-            )
+            OpenFGATupleBuilder.build_group_can_edit_controllers(group_id=1000)
         )
         await services.openfga_tuples.create(
-            OpenFGATupleBuilder.build_group_can_edit_identities(
-                group_id="teamA"
-            )
+            OpenFGATupleBuilder.build_group_can_edit_identities(group_id=1000)
         )
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_configurations(
-                group_id="teamA"
+                group_id=1000
             )
         )
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_boot_entities(
-                group_id="teamA"
+                group_id=1000
             )
         )
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_notifications(
-                group_id="teamA"
+                group_id=1000
             )
         )
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_license_keys(
-                group_id="teamA"
+                group_id=1000
             )
         )
         await services.openfga_tuples.create(
-            OpenFGATupleBuilder.build_group_can_view_devices(group_id="teamA")
+            OpenFGATupleBuilder.build_group_can_view_devices(group_id=1000)
         )
 
         # alice belongs to group team A
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_user_member_group(
-                user_id="alice", group_id="teamA"
+                user_id="alice", group_id=1000
             )
         )
 
         # team B can_edit_machines and can_view_machines in pool:0
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_edit_machines_in_pool(
-                group_id="teamB", pool_id="0"
+                group_id=2000, pool_id="0"
             )
         )
         # bob belongs to group team B
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_user_member_group(
-                user_id="bob", group_id="teamB"
+                user_id="bob", group_id=2000
             )
         )
 
         # team C can_view_machines in pool:0
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_deploy_machines_in_pool(
-                group_id="teamC", pool_id="0"
+                group_id=3000, pool_id="0"
             )
         )
         # carl belongs to group team C
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_user_member_group(
-                user_id="carl", group_id="teamC"
+                user_id="carl", group_id=3000
             )
         )
 
         # team D can_view_machines in pool:0
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_group_can_view_available_machines_in_pool(
-                group_id="teamD", pool_id="0"
+                group_id=4000, pool_id="0"
             )
         )
         # carl belongs to group team C
         await services.openfga_tuples.create(
             OpenFGATupleBuilder.build_user_member_group(
-                user_id="dingo", group_id="teamD"
+                user_id="dingo", group_id=4000
             )
         )
 
         await db_connection.commit()
 
         client = OpenFGAClient(str(openfga_socket_path))
-        # alice should have all permissions on pool1 because of teamA's system rights
+        # alice should have all permissions on pool1 because of 1000's system rights
         for i in range(0, 3):
             assert (
                 await client.can_edit_machines_in_pool(
