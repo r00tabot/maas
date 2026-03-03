@@ -1,4 +1,4 @@
-# Copyright 2024-2025 Canonical Ltd.  This software is licensed under the
+# Copyright 2024-2026 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from datetime import datetime, timedelta
@@ -23,6 +23,7 @@ async def create_test_user(fixture: Fixture, **extra_details: Any) -> User:
         "is_superuser": False,
         "first_name": "first",
         "last_name": "last",
+        "email": "mail@example.com",
         "is_staff": False,
         "is_active": True,
         "date_joined": date_joined,
