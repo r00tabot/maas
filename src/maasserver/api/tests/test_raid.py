@@ -11,7 +11,10 @@ from django.urls import reverse
 from maasserver.enum import FILESYSTEM_GROUP_TYPE, FILESYSTEM_TYPE, NODE_STATUS
 from maasserver.models.blockdevice import MIN_BLOCK_DEVICE_SIZE
 from maasserver.models.filesystem import Filesystem
-from maasserver.models.filesystemgroup import RAID, RAID_SUPERBLOCK_OVERHEAD
+from maasserver.models.filesystemgroup import (
+    get_raid_superblock_overhead,
+    RAID,
+)
 from maasserver.models.partition import MIN_PARTITION_SIZE
 from maasserver.models.partitiontable import PARTITION_TABLE_EXTRA_SPACE
 from maasserver.testing.api import APITestCase
@@ -315,7 +318,8 @@ class TestRaidsAPI(APITestCase.ForUser):
             parsed_partition_spares,
         ) = get_devices_from_raid(parsed_device)
         self.assertEqual(
-            PART_SIZE - RAID_SUPERBLOCK_OVERHEAD, parsed_device["size"]
+            PART_SIZE - get_raid_superblock_overhead(PART_SIZE),
+            parsed_device["size"],
         )
         self.assertEqual(uuid4, parsed_device["uuid"])
         self.assertCountEqual(block_devices, parsed_block_devices)
@@ -371,7 +375,8 @@ class TestRaidsAPI(APITestCase.ForUser):
             parsed_partition_spares,
         ) = get_devices_from_raid(parsed_device)
         self.assertEqual(
-            PART_SIZE - RAID_SUPERBLOCK_OVERHEAD, parsed_device["size"]
+            PART_SIZE - get_raid_superblock_overhead(PART_SIZE),
+            parsed_device["size"],
         )
         self.assertEqual(uuid4, parsed_device["uuid"])
         self.assertCountEqual(block_devices, parsed_block_devices)
@@ -428,9 +433,11 @@ class TestRaidsAPI(APITestCase.ForUser):
             parsed_block_device_spares,
             parsed_partition_spares,
         ) = get_devices_from_raid(parsed_device)
-        # Size is equivalent to 7 of the smallest device (the partitions).
+        # Size is (N-1) * usable_per_device for RAID 5 with 8 active devices.
+        min_size = large_partitions[0].size
+        usable = min_size - get_raid_superblock_overhead(min_size)
         self.assertEqual(
-            (7 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
+            usable * 7,
             parsed_device["size"],
         )
         self.assertCountEqual(block_devices, parsed_block_devices)
@@ -488,9 +495,11 @@ class TestRaidsAPI(APITestCase.ForUser):
             parsed_block_device_spares,
             parsed_partition_spares,
         ) = get_devices_from_raid(parsed_device)
-        # Size is equivalent to 6 of the smallest device (the partitions).
+        # Size is (N-2) * usable_per_device for RAID 6 with 8 active devices.
+        min_size = large_partitions[0].size
+        usable = min_size - get_raid_superblock_overhead(min_size)
         self.assertEqual(
-            (6 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
+            usable * 6,
             parsed_device["size"],
         )
         self.assertCountEqual(block_devices, parsed_block_devices)
@@ -548,9 +557,11 @@ class TestRaidsAPI(APITestCase.ForUser):
             parsed_block_device_spares,
             parsed_partition_spares,
         ) = get_devices_from_raid(parsed_device)
-        # Size is equivalent to 4 of the smallest device (the partitions).
+        # Size is (N/2) * usable_per_device for RAID 10 with 8 active devices.
+        min_size = large_partitions[0].size
+        usable = min_size - get_raid_superblock_overhead(min_size)
         self.assertEqual(
-            (4 * large_partitions[0].size) - RAID_SUPERBLOCK_OVERHEAD,
+            usable * 4,
             parsed_device["size"],
         )
         self.assertCountEqual(block_devices, parsed_block_devices)

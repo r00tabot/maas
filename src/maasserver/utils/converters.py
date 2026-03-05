@@ -105,6 +105,25 @@ def round_size_to_nearest_block(size, block_size, round_up=True):
     return block_size * number_of_blocks
 
 
+def round_size_to_nearest_power_of_2_in_gib(size, round_up=True):
+    """Round the size from bytes to the nearest GiB in power of 2 returning the new size.
+
+    :param size: The requested size to round.
+    :param round_up: If True, will round up to fill current block, else down.
+    """
+    size_in_gib = int(size // (1024**3))
+    if size_in_gib == 0:
+        if round_up:
+            return 2
+        else:
+            return 0
+    if round_up:
+        power = (size_in_gib - 1).bit_length()
+    else:
+        power = size_in_gib.bit_length() - 1
+    return 2**power
+
+
 def json_load_bytes(input: bytes, encoding=None) -> dict:
     """Load JSON from `input`.
 

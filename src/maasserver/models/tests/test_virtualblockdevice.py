@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 
 from maasserver.enum import FILESYSTEM_GROUP_TYPE
 from maasserver.models.blockdevice import MIN_BLOCK_DEVICE_SIZE
-from maasserver.models.filesystemgroup import RAID_SUPERBLOCK_OVERHEAD
+from maasserver.models.filesystemgroup import get_raid_superblock_overhead
 from maasserver.models.nodeconfig import NODE_CONFIG_TYPE
 from maasserver.models.virtualblockdevice import VirtualBlockDevice
 from maasserver.testing.factory import factory
@@ -77,12 +77,12 @@ class TestVirtualBlockDeviceManager(MAASServerTestCase):
         # filesystem_group.save() does not need to be called here. The
         # post_save performs that operation.
 
-        # The new size of the RAID-0 array should be the size of the smallest
-        # filesystem (in this case, they are all the same) times the number of
-        # filesystems in it.
-        array_size = (
-            new_size - RAID_SUPERBLOCK_OVERHEAD
-        ) * filesystem_group.filesystems.count()
+        # The new size of the RAID-0 array should be the sum of each
+        # device's usable space (size minus per-device superblock overhead).
+        array_size = sum(
+            new_size - get_raid_superblock_overhead(new_size)
+            for _ in range(filesystem_group.filesystems.count())
+        )
         self.assertEqual(
             array_size,
             reload_object(filesystem_group.virtual_device).size,
