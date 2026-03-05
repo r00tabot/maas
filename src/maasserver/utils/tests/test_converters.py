@@ -8,6 +8,7 @@ from textwrap import dedent
 from maasserver.utils.converters import (
     machine_readable_bytes,
     round_size_to_nearest_block,
+    round_size_to_nearest_power_of_2_in_gib,
     systemd_interval_to_calendar,
     XMLToYAML,
 )
@@ -131,4 +132,62 @@ class TestSystemdIntervalToCalendar(MAASTestCase):
         interval = "15s"
         self.assertEqual(
             "*-*-* *:*:00/15", systemd_interval_to_calendar(interval)
+        )
+
+
+GiB = 1024**3
+
+
+class TestRoundSizeToNearestPowerOf2InGiB(MAASTestCase):
+    def test_sub_gib_round_down_returns_zero(self):
+        self.assertEqual(
+            0, round_size_to_nearest_power_of_2_in_gib(512 * 1024**2, round_up=False)
+        )
+
+    def test_sub_gib_round_up_returns_two(self):
+        self.assertEqual(
+            2, round_size_to_nearest_power_of_2_in_gib(512 * 1024**2, round_up=True)
+        )
+
+    def test_zero_round_down_returns_zero(self):
+        self.assertEqual(
+            0, round_size_to_nearest_power_of_2_in_gib(0, round_up=False)
+        )
+
+    def test_exact_power_of_2_round_down(self):
+        self.assertEqual(
+            4, round_size_to_nearest_power_of_2_in_gib(4 * GiB, round_up=False)
+        )
+
+    def test_exact_power_of_2_round_up(self):
+        self.assertEqual(
+            4, round_size_to_nearest_power_of_2_in_gib(4 * GiB, round_up=True)
+        )
+
+    def test_non_power_of_2_round_down(self):
+        # 10 GiB rounds down to 8
+        self.assertEqual(
+            8, round_size_to_nearest_power_of_2_in_gib(10 * GiB, round_up=False)
+        )
+
+    def test_non_power_of_2_round_up(self):
+        # 10 GiB rounds up to 16
+        self.assertEqual(
+            16, round_size_to_nearest_power_of_2_in_gib(10 * GiB, round_up=True)
+        )
+
+    def test_1_gib_round_down(self):
+        self.assertEqual(
+            1, round_size_to_nearest_power_of_2_in_gib(1 * GiB, round_up=False)
+        )
+
+    def test_128_gib_round_down(self):
+        self.assertEqual(
+            128, round_size_to_nearest_power_of_2_in_gib(128 * GiB, round_up=False)
+        )
+
+    def test_1_tib_round_down(self):
+        # 1024 GiB rounds down to 1024
+        self.assertEqual(
+            1024, round_size_to_nearest_power_of_2_in_gib(1024 * GiB, round_up=False)
         )

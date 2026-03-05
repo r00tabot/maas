@@ -31,13 +31,21 @@ from maasserver.models.cacheset import CacheSet
 from maasserver.models.cleansave import CleanSave
 from maasserver.models.numa import NUMANode
 from maasserver.models.timestampedmodel import TimestampedModel
+from maasserver.utils.converters import round_size_to_nearest_power_of_2_in_gib
 from maasserver.utils.orm import get_one
 
 # Size of LVM physical extent. 4MiB
 LVM_PE_SIZE = 4 * 1024 * 1024
 
-# Size of the RAID overhead. 128k is maximum used.
-RAID_SUPERBLOCK_OVERHEAD = 128 * 1024
+def get_raid_superblock_overhead(size):
+    """Return the MD RAID superblock overhead for a single member device.
+
+    The overhead is computed by rounding the device size down to the nearest
+    power of 2 in GiB (capped at 128), adding 1, and using that as MiB.
+    This matches mdadm's validate_geometry1() in super1.c.
+    """
+    power2_gib = round_size_to_nearest_power_of_2_in_gib(size, round_up=False)
+    return (min(128, power2_gib) + 1) * (1024**2)
 
 
 class BaseFilesystemGroupManager(Manager):
@@ -514,10 +522,11 @@ class FilesystemGroup(CleanSave, TimestampedModel):
     def get_raid_size(self):
         """Size of this RAID.
 
-        Calculated based on the RAID type and how output size based on that
-        type. The size will be calculated using the smallest size filesystem
-        attached to this RAID. The linked `VirtualBlockDevice` should
-        calculate its size from this filesystem group.
+        Calculated based on the RAID type and the per-device available size
+        after subtracting MD superblock overhead.  Each member device
+        reserves space independently (superblock + bitmap + reshape
+        headroom), so the overhead is computed per-device, matching mdadm's
+        validate_geometry1() in super1.c.
 
         Note: Should only be called when the `group_type` is in
             `FILESYSTEM_GROUP_RAID_TYPES`.
@@ -526,26 +535,29 @@ class FilesystemGroup(CleanSave, TimestampedModel):
         if min_size <= 0:
             # Possible when no filesytems are attached to this group.
             return 0
-        elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_0:
-            return self.get_total_size() - (
-                RAID_SUPERBLOCK_OVERHEAD * self.filesystems.count()
+        if self.group_type == FILESYSTEM_GROUP_TYPE.RAID_0:
+            # RAID 0 sums each device's usable space individually.
+            return sum(
+                fs.get_size() - get_raid_superblock_overhead(fs.get_size())
+                for fs in self.filesystems.all()
             )
-        elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_1:
-            return min_size - RAID_SUPERBLOCK_OVERHEAD
-        else:
-            num_raid = len(
-                [
-                    fstype
-                    for fstype in self._get_all_fstypes()
-                    if fstype == FILESYSTEM_TYPE.RAID
-                ]
-            )
-            if self.group_type == FILESYSTEM_GROUP_TYPE.RAID_5:
-                return (min_size * (num_raid - 1)) - RAID_SUPERBLOCK_OVERHEAD
-            elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_6:
-                return (min_size * (num_raid - 2)) - RAID_SUPERBLOCK_OVERHEAD
-            elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_10:
-                return (min_size * num_raid / 2) - RAID_SUPERBLOCK_OVERHEAD
+        # For all other levels the array is limited by the smallest device.
+        usable_per_device = min_size - get_raid_superblock_overhead(min_size)
+        if self.group_type == FILESYSTEM_GROUP_TYPE.RAID_1:
+            return usable_per_device
+        num_raid = len(
+            [
+                fstype
+                for fstype in self._get_all_fstypes()
+                if fstype == FILESYSTEM_TYPE.RAID
+            ]
+        )
+        if self.group_type == FILESYSTEM_GROUP_TYPE.RAID_5:
+            return usable_per_device * (num_raid - 1)
+        elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_6:
+            return usable_per_device * (num_raid - 2)
+        elif self.group_type == FILESYSTEM_GROUP_TYPE.RAID_10:
+            return usable_per_device * num_raid // 2
         raise ValidationError("Unknown raid type: %s" % self.group_type)
 
     def get_bcache_backing_filesystem(self):

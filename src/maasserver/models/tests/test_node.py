@@ -12392,7 +12392,7 @@ class TestNodeStorageClone_ComplexDiskLayout(
             type: partition
             number: 1
             offset: 4194304B
-            size: 2199014866944B
+            size: 2198746431488B
             wipe: superblock
             device: md0
           - id: sda-part1_format
@@ -12619,7 +12619,7 @@ class TestNodeStorageClone_ComplexDiskLayout(
         raid_5_partition = factory.make_Partition(
             partition_table=raid_5_partition_table,
             uuid="18a6e885-3e6d-4505-8a0d-cf34df11a8b0",
-            size=(2 * 1024**4) - PARTITION_TABLE_EXTRA_SPACE,
+            size=raid_5.virtual_device.size - PARTITION_TABLE_EXTRA_SPACE,
             bootable=False,
         )
         factory.make_Filesystem(
