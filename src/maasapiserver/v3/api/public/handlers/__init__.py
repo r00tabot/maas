@@ -24,6 +24,7 @@ from maasapiserver.v3.api.public.handlers.files import FilesHandler
 from maasapiserver.v3.api.public.handlers.interfaces import InterfacesHandler
 from maasapiserver.v3.api.public.handlers.ipranges import IPRangesHandler
 from maasapiserver.v3.api.public.handlers.machines import MachinesHandler
+from maasapiserver.v3.api.public.handlers.nos import NOSInstallerHandler
 from maasapiserver.v3.api.public.handlers.notifications import (
     NotificationsHandler,
 )
@@ -46,6 +47,7 @@ from maasapiserver.v3.api.public.handlers.subnets import (
     SubnetsHandler,
     UISubnetsHandler,
 )
+from maasapiserver.v3.api.public.handlers.switches import SwitchesHandler
 from maasapiserver.v3.api.public.handlers.tags import TagsHandler
 from maasapiserver.v3.api.public.handlers.usergroups import UserGroupsHandler
 from maasapiserver.v3.api.public.handlers.users import UsersHandler
@@ -71,6 +73,7 @@ APIv3 = API(
         IPRangesHandler(),
         MachinesHandler(),
         NotificationsHandler(),
+        NOSInstallerHandler(),
         PackageRepositoriesHandler(),
         RacksHandler(),
         ReservedIPsHandler(),
@@ -81,6 +84,7 @@ APIv3 = API(
         SshKeysHandler(),
         SSLKeysHandler(),
         SubnetsHandler(),
+        SwitchesHandler(),
         TagsHandler(),
         UserGroupsHandler(),
         UsersHandler(),
