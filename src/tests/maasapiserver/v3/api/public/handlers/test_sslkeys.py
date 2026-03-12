@@ -1,6 +1,7 @@
-#  Copyright 2025 Canonical Ltd.  This software is licensed under the
-#  GNU Affero General Public License version 3 (see the file LICENSE).
+# Copyright 2025-2026 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 
+from typing import Callable
 from unittest.mock import Mock
 
 from fastapi.encoders import jsonable_encoder
@@ -15,6 +16,7 @@ from maasapiserver.v3.api.public.models.responses.sslkey import (
     SSLKeysWithSummaryListResponse,
 )
 from maasapiserver.v3.constants import V3_API_PREFIX
+from maascommon.openfga.base import MAASResourceEntitlement
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.sslkeys import SSLKeyClauseFactory
 from maasservicelayer.exceptions.catalog import (
@@ -56,33 +58,49 @@ class TestSSLKeysApi(ApiCommonTests):
     BASE_PATH = f"{V3_API_PREFIX}/users/me/sslkeys"
 
     @pytest.fixture
-    def user_endpoints(self) -> list[Endpoint]:
+    def endpoints_with_authorization(self) -> list[Endpoint]:
         return [
-            Endpoint(method="GET", path=f"{self.BASE_PATH}"),
+            Endpoint(
+                method="GET",
+                path=f"{self.BASE_PATH}",
+                permission=MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+            ),
             Endpoint(
                 method="GET",
                 path=f"{V3_API_PREFIX}/users/me/sslkeys_with_summary",
+                permission=MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
             ),
-            Endpoint(method="GET", path=f"{self.BASE_PATH}/1"),
-            Endpoint(method="POST", path=f"{self.BASE_PATH}"),
-            Endpoint(method="DELETE", path=f"{self.BASE_PATH}/1"),
+            Endpoint(
+                method="GET",
+                path=f"{self.BASE_PATH}/1",
+                permission=MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+            ),
+            Endpoint(
+                method="POST",
+                path=f"{self.BASE_PATH}",
+                permission=MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+            ),
+            Endpoint(
+                method="DELETE",
+                path=f"{self.BASE_PATH}/1",
+                permission=MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+            ),
         ]
-
-    @pytest.fixture
-    def admin_endpoints(self) -> list[Endpoint]:
-        return []
 
     # GET /users/me/sslkeys
     async def test_list_user_sslkeys_has_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.list.return_value = ListResult[SSLKey](
             items=[SSLKEY_1], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}?size=1",
         )
 
@@ -95,13 +113,16 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_list_user_sslkeys_no_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.list.return_value = ListResult[SSLKey](
             items=[SSLKEY_1, SSLKEY_2], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}?size=2",
         )
 
@@ -115,13 +136,16 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_list_with_summary_no_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.list.return_value = ListResult[SSLKey](
             items=[SSLKEY_1, SSLKEY_2], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{V3_API_PREFIX}/users/me/sslkeys_with_summary?size=2"
         )
         assert response.status_code == 200
@@ -156,13 +180,16 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_list_with_summary_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.list.return_value = ListResult[SSLKey](
             items=[SSLKEY_1], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{V3_API_PREFIX}/users/me/sslkeys_with_summary?size=1"
         )
         assert response.status_code == 200
@@ -180,14 +207,15 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_get_user_sslkey(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.get_one.return_value = SSLKEY_1
 
-        response = await mocked_api_client_user.get(
-            f"{self.BASE_PATH}/{SSLKEY_1.id}"
-        )
+        response = await client.get(f"{self.BASE_PATH}/{SSLKEY_1.id}")
 
         assert response.status_code == 200
         assert len(response.headers["ETag"]) > 0
@@ -200,16 +228,17 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_get_user_sslkey_404(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         invalid_sslkey_id = 99
 
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.get_one.return_value = None
 
-        response = await mocked_api_client_user.get(
-            f"{self.BASE_PATH}/{invalid_sslkey_id}"
-        )
+        response = await client.get(f"{self.BASE_PATH}/{invalid_sslkey_id}")
 
         assert response.status_code == 404
         assert "ETag" not in response.headers
@@ -222,8 +251,11 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_create_user_sslkey_201(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         now = utcnow()
         test_ssl_key = get_test_data_file("test_x509_0.pem")
 
@@ -242,7 +274,7 @@ class TestSSLKeysApi(ApiCommonTests):
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.create.return_value = new_sslkey
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             self.BASE_PATH,
             json=jsonable_encoder(create_sslkey_request),
         )
@@ -258,8 +290,11 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_create_user_sslkey_409(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         now = utcnow()
         test_ssl_key = get_test_data_file("test_x509_0.pem")
 
@@ -288,14 +323,14 @@ class TestSSLKeysApi(ApiCommonTests):
             ),
         ]
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             self.BASE_PATH,
             json=jsonable_encoder(create_sslkey_request),
         )
 
         assert response.status_code == 201
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             self.BASE_PATH,
             json=jsonable_encoder(create_sslkey_request),
         )
@@ -310,14 +345,17 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_create_user_sslkey_422(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         new_sslkey_request = {"key": None}
 
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.create.return_value = None
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             self.BASE_PATH,
             json=jsonable_encoder(new_sslkey_request),
         )
@@ -333,12 +371,15 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_delete_user_sslkey_204(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sslkeys = Mock(SSLKeysService)
         services_mock.sslkeys.delete_one.side_effect = None
 
-        response = await mocked_api_client_user.delete(
+        response = await client.delete(
             f"{self.BASE_PATH}/1",
         )
 
@@ -359,8 +400,11 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_delete_user_sslkey_with_etag(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         sslkey_id_to_delete = 1
         wrong_etag = "wrong_tag"
 
@@ -374,7 +418,7 @@ class TestSSLKeysApi(ApiCommonTests):
             ]
         )
 
-        response = await mocked_api_client_user.delete(
+        response = await client.delete(
             f"{self.BASE_PATH}/{sslkey_id_to_delete}",
             headers={"if-match": wrong_etag},
         )
@@ -396,8 +440,11 @@ class TestSSLKeysApi(ApiCommonTests):
     async def test_delete_user_sslkey_404(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         sslkey_id_to_delete = 99
 
         services_mock.sslkeys = Mock(SSLKeysService)
@@ -410,7 +457,7 @@ class TestSSLKeysApi(ApiCommonTests):
             ]
         )
 
-        response = await mocked_api_client_user.delete(
+        response = await client.delete(
             f"{self.BASE_PATH}/{sslkey_id_to_delete}",
         )
 

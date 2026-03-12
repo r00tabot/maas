@@ -1,6 +1,7 @@
-#  Copyright 2025 Canonical Ltd.  This software is licensed under the
-#  GNU Affero General Public License version 3 (see the file LICENSE).
+# Copyright 2025-2026 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 
+from typing import Callable
 from unittest.mock import Mock
 
 from httpx import AsyncClient
@@ -13,6 +14,7 @@ from maasapiserver.v3.api.public.models.responses.sshkeys import (
 )
 from maasapiserver.v3.constants import V3_API_PREFIX
 from maascommon.enums.sshkeys import SshKeysProtocolType
+from maascommon.openfga.base import MAASResourceEntitlement
 from maasservicelayer.db.filters import QuerySpec
 from maasservicelayer.db.repositories.sshkeys import SshKeyClauseFactory
 from maasservicelayer.exceptions.catalog import (
@@ -51,29 +53,48 @@ class TestSshKeyApi(ApiCommonTests):
     BASE_PATH = f"{V3_API_PREFIX}/users/me/sshkeys"
 
     @pytest.fixture
-    def user_endpoints(self) -> list[Endpoint]:
+    def endpoints_with_authorization(self) -> list[Endpoint]:
         return [
-            Endpoint(method="GET", path=f"{self.BASE_PATH}"),
-            Endpoint(method="GET", path=f"{self.BASE_PATH}/1"),
-            Endpoint(method="POST", path=self.BASE_PATH),
-            Endpoint(method="POST", path=f"{self.BASE_PATH}:import"),
-            Endpoint(method="DELETE", path=f"{self.BASE_PATH}/1"),
+            Endpoint(
+                method="GET",
+                path=f"{self.BASE_PATH}",
+                permission=MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+            ),
+            Endpoint(
+                method="GET",
+                path=f"{self.BASE_PATH}/1",
+                permission=MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+            ),
+            Endpoint(
+                method="POST",
+                path=self.BASE_PATH,
+                permission=MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+            ),
+            Endpoint(
+                method="POST",
+                path=f"{self.BASE_PATH}:import",
+                permission=MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+            ),
+            Endpoint(
+                method="DELETE",
+                path=f"{self.BASE_PATH}/1",
+                permission=MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+            ),
         ]
-
-    @pytest.fixture
-    def admin_endpoints(self) -> list[Endpoint]:
-        return []
 
     async def test_list_user_sshkeys_has_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.list.return_value = ListResult[SshKey](
             items=[SSHKEY_1], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}?size=1",
         )
 
@@ -85,13 +106,16 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_list_user_sshkeys_no_other_page(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.list.return_value = ListResult[SshKey](
             items=[SSHKEY_1, SSHKEY_2], total=2
         )
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}?size=2",
         )
 
@@ -104,12 +128,15 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_get_200(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.get_one.return_value = SSHKEY_2
 
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}/{SSHKEY_2.id}",
         )
 
@@ -127,12 +154,15 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_get_404(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_VIEW_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.get_one.return_value = None
 
-        response = await mocked_api_client_user.get(
+        response = await client.get(
             f"{self.BASE_PATH}/{SSHKEY_1.id}",
         )
 
@@ -142,16 +172,17 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_create_201(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.create.return_value = SSHKEY_1
 
         sshkey_request = {"key": TEST_ED25519_KEY}
 
-        response = await mocked_api_client_user.post(
-            self.BASE_PATH, json=sshkey_request
-        )
+        response = await client.post(self.BASE_PATH, json=sshkey_request)
 
         assert response.status_code == 201
         assert "ETag" in response.headers
@@ -164,14 +195,17 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_import_201(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.import_keys.return_value = [SSHKEY_2]
 
         sshkey_request = {"protocol": "lp", "auth_id": "foo"}
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             f"{self.BASE_PATH}:import", json=sshkey_request
         )
 
@@ -196,17 +230,20 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_import_422(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
         protocol: str | None,
         auth_id: str | None,
         message: str,
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.create.return_value = SSHKEY_1
 
         sshkey_request = {"protocol": protocol, "auth_id": auth_id}
 
-        response = await mocked_api_client_user.post(
+        response = await client.post(
             f"{self.BASE_PATH}:import", json=sshkey_request
         )
 
@@ -219,20 +256,26 @@ class TestSshKeyApi(ApiCommonTests):
     async def test_delete_204(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.get_one.return_value = SSHKEY_1
         services_mock.sshkeys.delete_by_id.return_value = SSHKEY_1
 
-        response = await mocked_api_client_user.delete(f"{self.BASE_PATH}/1")
+        response = await client.delete(f"{self.BASE_PATH}/1")
         assert response.status_code == 204
 
     async def test_delete_with_etag(
         self,
         services_mock: ServiceCollectionV3,
-        mocked_api_client_user: AsyncClient,
+        mocked_api_client_user_with_permissions: Callable[..., AsyncClient],
     ) -> None:
+        client = mocked_api_client_user_with_permissions(
+            MAASResourceEntitlement.CAN_EDIT_IDENTITIES,
+        )
         services_mock.sshkeys = Mock(SshKeysService)
         services_mock.sshkeys.delete_one.side_effect = PreconditionFailedException(
             details=[
@@ -243,7 +286,7 @@ class TestSshKeyApi(ApiCommonTests):
             ]
         )
 
-        response = await mocked_api_client_user.delete(
+        response = await client.delete(
             f"{self.BASE_PATH}/1", headers={"if-match": "wrong_etag"}
         )
         assert response.status_code == 412
